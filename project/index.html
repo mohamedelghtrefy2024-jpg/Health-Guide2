@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="مرشدك الصحي - تطبيق تغذية ذكي">
+  <meta name="theme-color" content="#10b981">
+  <title>مرشدك الصحي 💪</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    :root {
+      --primary: #10b981; --secondary: #059669;
+      --success: #34d399; --warning: #f59e0b;
+      --danger: #ef4444; --dark: #1f2937;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',Tahoma,sans-serif; background:linear-gradient(135deg,#1f2937 0%,#111827 100%); color:#f3f4f6; min-height:100vh; }
+    .container { max-width:900px; margin:0 auto; padding:16px; }
+    header { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:16px 20px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; }
+    h1 { font-size:22px; color:#10b981; }
+    .theme-toggle { background:#374151; border:none; color:white; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:18px; }
+    .tabs-container { display:flex; gap:6px; margin-bottom:16px; overflow-x:auto; padding:8px; background:rgba(0,0,0,0.2); border-radius:12px; }
+    .tab-button { background:rgba(255,255,255,0.1); border:1px solid rgba(16,185,129,0.3); color:#f3f4f6; padding:8px 14px; border-radius:8px; cursor:pointer; white-space:nowrap; font-size:13px; font-weight:500; transition:all 0.2s; }
+    .tab-button:hover { background:rgba(16,185,129,0.2); }
+    .tab-button.active { background:#10b981; color:white; border-color:#10b981; }
+    .content { background:rgba(255,255,255,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:12px; padding:20px; margin-bottom:16px; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; animation:fadeIn 0.3s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .card { background:rgba(255,255,255,0.08); border:1px solid rgba(16,185,129,0.2); border-radius:10px; padding:14px; margin-bottom:14px; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    @media(max-width:600px) { .grid-4{grid-template-columns:repeat(2,1fr)} .grid-2{grid-template-columns:1fr} }
+    .stat-card { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:14px; text-align:center; }
+    .stat-val { font-size:22px; font-weight:700; color:#10b981; }
+    .stat-label { font-size:12px; color:#9ca3af; margin-top:4px; }
+    .form-group { margin-bottom:14px; }
+    .form-group label { display:block; margin-bottom:6px; font-size:13px; color:#9ca3af; }
+    .form-group input, .form-group select, .form-group textarea {
+      width:100%; padding:10px 12px; border-radius:8px;
+      border:1px solid rgba(16,185,129,0.3); background:rgba(255,255,255,0.05);
+      color:#f3f4f6; font-size:14px; outline:none; transition:border 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus { border-color:#10b981; }
+    .form-group select option { background:#1f2937; color:#f3f4f6; }
+    .btn { background:#10b981; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:500; transition:all 0.2s; }
+    .btn:hover { background:#059669; transform:translateY(-1px); }
+    .btn-sm { padding:6px 12px; font-size:12px; }
+    .btn-secondary { background:#374151; }
+    .btn-secondary:hover { background:#4b5563; }
+    .btn-danger { background:#ef4444; }
+    .btn-danger:hover { background:#dc2626; }
+    .progress-bar-bg { background:rgba(255,255,255,0.1); border-radius:10px; height:10px; overflow:hidden; margin:8px 0; }
+    .progress-bar-fill { height:100%; background:linear-gradient(90deg,#10b981,#34d399); border-radius:10px; transition:width 0.5s; }
+    .meal-slot { background:rgba(255,255,255,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:10px; padding:14px; margin-bottom:12px; }
+    .meal-slot h3 { font-size:15px; color:#10b981; margin-bottom:10px; }
+    .meal-slot .meal-total { font-size:12px; color:#9ca3af; margin-top:8px; }
+    .food-item { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:rgba(16,185,129,0.05); border-radius:6px; margin-bottom:6px; font-size:13px; }
+    .food-item button { background:none; border:none; color:#ef4444; cursor:pointer; font-size:16px; padding:0 4px; }
+    .empty-state { text-align:center; padding:30px 20px; color:#9ca3af; }
+    .empty-state p { font-size:14px; margin-bottom:14px; }
+    .food-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+    .food-card { background:rgba(255,255,255,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:10px; padding:12px; text-align:center; cursor:pointer; transition:all 0.2s; position:relative; }
+    .food-card:hover { background:rgba(16,185,129,0.1); border-color:#10b981; }
+    .food-emoji { font-size:28px; margin-bottom:6px; }
+    .food-name { font-size:12px; font-weight:600; margin-bottom:4px; }
+    .food-kcal { font-size:11px; color:#10b981; margin-bottom:4px; }
+    .food-macros { font-size:10px; color:#9ca3af; }
+    .fav-btn { position:absolute; top:6px; left:6px; background:none; border:none; cursor:pointer; font-size:16px; color:#9ca3af; transition:color 0.2s; }
+    .fav-btn.active { color:#ef4444; }
+    .cat-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+    .cat-btn { background:rgba(255,255,255,0.05); border:1px solid rgba(16,185,129,0.2); color:#f3f4f6; padding:6px 12px; border-radius:20px; cursor:pointer; font-size:12px; transition:all 0.2s; }
+    .cat-btn:hover, .cat-btn.active { background:rgba(16,185,129,0.2); border-color:#10b981; color:#10b981; }
+    .weight-log-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:10px; }
+    .weight-log-table th, .weight-log-table td { padding:8px 12px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.1); }
+    .weight-log-table th { color:#9ca3af; font-weight:500; }
+    .increase { color:#ef4444; } .decrease { color:#10b981; }
+    .exercise-item { display:flex; justify-content:space-between; align-items:center; padding:10px; background:rgba(16,185,129,0.05); border-radius:8px; margin-bottom:8px; }
+    .challenge-item { padding:12px; background:rgba(255,255,255,0.05); border-radius:10px; margin-bottom:10px; }
+    .challenge-name { font-size:14px; font-weight:600; margin-bottom:8px; }
+    .toast { position:fixed; bottom:20px; right:20px; padding:12px 20px; border-radius:10px; color:white; font-size:14px; z-index:9999; animation:slideIn 0.3s ease; max-width:300px; }
+    .toast.success { background:#10b981; }
+    .toast.warning { background:#f59e0b; }
+    .toast.error { background:#ef4444; }
+    .toast.info { background:#3b82f6; }
+    @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:#1f2937; border:1px solid rgba(16,185,129,0.3); border-radius:14px; padding:24px; width:90%; max-width:400px; max-height:80vh; overflow-y:auto; }
+    .modal h3 { color:#10b981; margin-bottom:16px; font-size:16px; }
+    .modal-close { float:left; background:none; border:none; color:#9ca3af; font-size:20px; cursor:pointer; }
+    footer { text-align:center; padding:20px; color:#9ca3af; border-top:1px solid rgba(16,185,129,0.2); margin-top:20px; font-size:13px; }
+    .macro-row { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+    .macro-badge { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding:6px 12px; font-size:12px; text-align:center; flex:1; min-width:70px; }
+    .macro-badge span { display:block; font-size:16px; font-weight:700; color:#10b981; }
+    .plan-card { background:rgba(255,255,255,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:10px; padding:14px; margin-bottom:12px; cursor:pointer; transition:all 0.2s; }
+    .plan-card:hover { border-color:#10b981; background:rgba(16,185,129,0.05); }
+    .plan-meal { padding:10px; border-bottom:1px solid rgba(255,255,255,0.05); font-size:13px; }
+    .plan-meal:last-child { border-bottom:none; }
+    .plan-meal-name { color:#10b981; font-weight:600; margin-bottom:4px; }
+    .nsv-item { padding:10px; background:rgba(16,185,129,0.05); border-radius:8px; margin-bottom:8px; font-size:13px; display:flex; justify-content:space-between; align-items:center; }
+    .chart-bar-container { display:flex; align-items:flex-end; gap:6px; height:120px; padding:10px 0; }
+    .chart-bar { flex:1; background:linear-gradient(180deg,#10b981,#059669); border-radius:4px 4px 0 0; min-width:20px; position:relative; }
+    .chart-bar-label { position:absolute; bottom:-20px; width:100%; text-align:center; font-size:9px; color:#9ca3af; }
+    .chart-bar-val { position:absolute; top:-18px; width:100%; text-align:center; font-size:9px; color:#10b981; }
+    .guide-menu { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+    .guide-btn { background:rgba(255,255,255,0.05); border:1px solid rgba(16,185,129,0.2); color:#f3f4f6; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; transition:all 0.2s; }
+    .guide-btn:hover, .guide-btn.active { background:rgba(16,185,129,0.15); border-color:#10b981; color:#10b981; }
+    .guide-section h3 { color:#10b981; margin-bottom:10px; font-size:15px; }
+    .guide-section p, .guide-section li { font-size:13px; color:#d1d5db; line-height:1.7; margin-bottom:6px; }
+    .guide-section ul { padding-right:20px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <h1>💪 مرشدك الصحي</h1>
+    <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs-container">
+    <button class="tab-button active" data-tab="profile">👤 الملف الشخصي</button>
+    <button class="tab-button" data-tab="tracker">📊 التتبع</button>
+    <button class="tab-button" data-tab="library">📚 المكتبة</button>
+    <button class="tab-button" data-tab="planner">📋 الخطة</button>
+    <button class="tab-button" data-tab="exercises">🏋️ التمارين</button>
+    <button class="tab-button" data-tab="challenges">🎯 التحديات</button>
+    <button class="tab-button" data-tab="insights">📈 التحليلات</button>
+    <button class="tab-button" data-tab="guide">❓ الدليل</button>
+  </div>
+
+  <div class="content">
+
+    <!-- ===== تبويب الملف الشخصي ===== -->
+    <div id="profileTab" class="tab-content active">
+      <!-- ملخص سريع -->
+      <div id="profileSummaryContainer" class="card">
+        <div class="grid-4">
+          <div class="stat-card"><div class="stat-val" id="profileBMIVal">--</div><div class="stat-label">BMI</div></div>
+          <div class="stat-card"><div class="stat-val" id="profileBMRVal">--</div><div class="stat-label">BMR</div></div>
+          <div class="stat-card"><div class="stat-val" id="profileTDEEVal">--</div><div class="stat-label">TDEE</div></div>
+          <div class="stat-card"><div class="stat-val" id="profileTargetVal" style="color:#f59e0b">--</div><div class="stat-label">الهدف اليومي</div></div>
+        </div>
+      </div>
+
+      <!-- الفورم -->
+      <div class="card">
+        <div class="grid-2">
+          <div class="form-group">
+            <label>الاسم</label>
+            <input id="profileName" type="text" placeholder="اسمك">
+          </div>
+          <div class="form-group">
+            <label>العمر</label>
+            <input id="profileAge" type="number" placeholder="30" min="10" max="100">
+          </div>
+          <div class="form-group">
+            <label>الجنس</label>
+            <select id="profileGender">
+              <option value="male">ذكر</option>
+              <option value="female">أنثى</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>الوزن الحالي (كجم)</label>
+            <input id="profileWeight" type="number" placeholder="75" min="30" max="300" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>الطول (سم)</label>
+            <input id="profileHeight" type="number" placeholder="175" min="100" max="250">
+          </div>
+          <div class="form-group">
+            <label>الوزن المستهدف (كجم)</label>
+            <input id="profileTargetWeight" type="number" placeholder="70" min="30" max="300" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>مستوى النشاط</label>
+            <select id="profileActivity">
+              <option value="1.2">خامل (بدون تمرين)</option>
+              <option value="1.375">خفيف (1-3 أيام/أسبوع)</option>
+              <option value="1.55" selected>متوسط (3-5 أيام/أسبوع)</option>
+              <option value="1.725">عالي (6-7 أيام/أسبوع)</option>
+              <option value="1.9">مكثف جداً</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>الهدف</label>
+            <select id="profileGoal">
+              <option value="loss">خسارة وزن</option>
+              <option value="maintain">تثبيت الوزن</option>
+              <option value="gain">زيادة الوزن</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>الدين (للصيام)</label>
+            <select id="profileReligion">
+              <option value="">بدون</option>
+              <option value="muslim">مسلم</option>
+              <option value="christian">مسيحي</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>النظام الغذائي</label>
+            <select id="profileDietProfile">
+              <option value="">بدون قيود</option>
+              <option value="pescatarian">بيسكاتاريان (سمك فقط)</option>
+              <option value="vegan">نباتي صرف</option>
+              <option value="glutenFree">خالي من الجلوتين</option>
+              <option value="lactoseFree">خالي من اللاكتوز</option>
+              <option value="nutFree">خالي من المكسرات</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn" onclick="saveProfileChanges(S.profile)">💾 حفظ البيانات</button>
+      </div>
+
+      <!-- سجل الوزن -->
+      <div class="card">
+        <h3 style="color:#10b981;margin-bottom:12px">📉 سجل الوزن</h3>
+        <div style="display:flex;gap:10px;margin-bottom:12px">
+          <input id="newWeightInput" type="number" placeholder="أدخل وزنك اليوم" step="0.1"
+            style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid rgba(16,185,129,0.3);background:rgba(255,255,255,0.05);color:#f3f4f6">
+          <button class="btn btn-sm" onclick="addWeightEntry()">+ إضافة</button>
+        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="weightProgressBar" style="width:0%"></div></div>
+        <div id="weightProgressText" style="font-size:12px;color:#9ca3af;text-align:center;margin-bottom:10px"></div>
+        <div id="weightLogContainer"></div>
+      </div>
+    </div>
+
+    <!-- ===== تبويب التتبع ===== -->
+    <div id="trackerTab" class="tab-content">
+      <!-- ملخص اليوم -->
+      <div id="trackerSummaryContainer" class="card">
+        <div class="macro-row">
+          <div class="macro-badge"><span id="trackerKcal">0</span>سعرة</div>
+          <div class="macro-badge"><span id="trackerProtein">0</span>بروتين جم</div>
+          <div class="macro-badge"><span id="trackerCarbs">0</span>كارب جم</div>
+          <div class="macro-badge"><span id="trackerFat">0</span>دهون جم</div>
+          <div class="macro-badge"><span id="trackerWater">0</span>ماء مل</div>
+        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="trackerProgressBar" style="width:0%"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#9ca3af">
+          <span>0 سعرة</span>
+          <span id="trackerKcalLabel">الهدف: -- سعرة</span>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="btn btn-sm" onclick="addWaterEntry(250)">💧 +250مل</button>
+          <button class="btn btn-sm" onclick="addWaterEntry(500)">💧 +500مل</button>
+          <button class="btn btn-sm btn-secondary" onclick="confirmClearDay()">🗑 مسح اليوم</button>
+        </div>
+      </div>
+      <!-- وجبات اليوم -->
+      <div id="mealSlotsContainer"></div>
+      <!-- إحصائيات -->
+      <div id="trackerStatsContainer"></div>
+    </div>
+
+    <!-- ===== تبويب المكتبة ===== -->
+    <div id="libraryTab" class="tab-content">
+      <div id="categoryFilterContainer" class="cat-filters"></div>
+      <div id="favoritesBarContainer"></div>
+      <input type="text" id="foodSearch" placeholder="🔍 ابحث عن طعام..."
+        style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid rgba(16,185,129,0.3);background:rgba(255,255,255,0.05);color:#f3f4f6;margin-bottom:14px;font-size:14px;outline:none">
+      <div id="foodGridContainer"></div>
+    </div>
+
+    <!-- ===== تبويب الخطة ===== -->
+    <div id="plannerTab" class="tab-content">
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn" onclick="generateSmartPlan(S.profile)">⚡ توليد خطة ذكية</button>
+        <button class="btn btn-secondary" onclick="loadReadyMadePlan()">📅 خطة جاهزة</button>
+        <button class="btn btn-secondary" onclick="generateWeeklyPlan(S.profile)">📅 خطة أسبوعية</button>
+      </div>
+      <div id="savedPlansContainer"></div>
+      <div id="planDetailsContainer"></div>
+    </div>
+
+    <!-- ===== تبويب التمارين ===== -->
+    <div id="exercisesTab" class="tab-content">
+      <div id="exerciseSummaryContainer" class="card">
+        <div class="grid-2">
+          <div class="stat-card"><div class="stat-val" id="burnToday">0</div><div class="stat-label">🔥 حرق اليوم (سعرة)</div></div>
+          <div class="stat-card"><div class="stat-val" id="durationToday">0</div><div class="stat-label">⏱ مدة التمرين (دقيقة)</div></div>
+        </div>
+      </div>
+      <div id="exerciseLogContainer"></div>
+      <div id="suggestedExercisesContainer"></div>
+      <div id="weeklyStatsContainer"></div>
+    </div>
+
+    <!-- ===== تبويب التحديات ===== -->
+    <div id="challengesTab" class="tab-content">
+      <div id="pointsContainer" class="card">
+        <div class="grid-2">
+          <div class="stat-card"><div class="stat-val" id="totalPoints">0</div><div class="stat-label">⭐ نقاطك الكلية</div></div>
+          <div class="stat-card"><div class="stat-val" id="weeklyPoints">0</div><div class="stat-label">📅 نقاط هذا الأسبوع</div></div>
+        </div>
+      </div>
+      <div id="challengesContainer"></div>
+      <div class="card">
+        <h3 style="color:#10b981;margin-bottom:12px">🏆 انتصاراتك خارج الميزان</h3>
+        <div style="display:flex;gap:10px;margin-bottom:10px">
+          <textarea id="nsvInput" placeholder="مثال: لبست ملابس ضيقة كانت، نمت أحسن..." rows="2"
+            style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(16,185,129,0.3);background:rgba(255,255,255,0.05);color:#f3f4f6;resize:none;font-size:13px"></textarea>
+          <button class="btn" onclick="recordNSV(document.getElementById('nsvInput').value); document.getElementById('nsvInput').value=''">✨ سجّل</button>
+        </div>
+        <div id="nsvListContainer"></div>
+      </div>
+    </div>
+
+    <!-- ===== تبويب التحليلات ===== -->
+    <div id="insightsTab" class="tab-content">
+      <div id="weeklyReportContainer" class="card"></div>
+      <div id="weeklyChartContainer" class="card"></div>
+      <div id="weightChartContainer" class="card"></div>
+      <div id="monthlyReportContainer" class="card"></div>
+      <div id="performanceAnalysisContainer" class="card"></div>
+      <div id="predictionContainer" class="card"></div>
+    </div>
+
+    <!-- ===== تبويب الدليل ===== -->
+    <div id="guideTab" class="tab-content">
+      <div id="guideMenuContainer" class="guide-menu"></div>
+      <div id="guideContainer"></div>
+    </div>
+
+  </div><!-- end .content -->
+
+  <footer>
+    <p>مرشدك الصحي v5.5 © 2026 | تطبيق تغذية ذكي 🌿</p>
+  </footer>
+</div>
+
+<!-- Modal لإضافة طعام -->
+<div id="addFoodModal" class="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('addFoodModal')">✕</button>
+    <h3 id="addFoodModalTitle">إضافة طعام</h3>
+    <input type="text" id="addFoodSearch" placeholder="ابحث عن طعام..." oninput="searchFoodsModal(this.value)"
+      style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(16,185,129,0.3);background:rgba(31,41,55,0.8);color:#f3f4f6;margin-bottom:12px;font-size:14px">
+    <div id="addFoodResults" style="max-height:300px;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- Modal تفاصيل الطعام -->
+<div id="foodDetailModal" class="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('foodDetailModal')">✕</button>
+    <div id="foodDetailContent"></div>
+  </div>
+</div>
+
+<!-- ===== Safety First ===== -->
+<script src="js/core/safety.js"></script>
+
+<!-- Scripts -->
+<script src="js/database/FOOD_UNITS_NEW.js"></script>
+<script src="js/database/FOODS.js"></script>
+<script src="js/database/ADVANCED_FOODS.js"></script>
+<script src="js/plans/MEAL_PLANS.js"></script>
+<script src="js/plans/DIET_FILTERS.js"></script>
+<script src="js/fasting/fasting-core.js"></script>
+<script src="js/fasting/islamic.js"></script>
+<script src="js/fasting/christian.js"></script>
+<script src="js/core/storage.js"></script>
+<script src="js/core/utils.js"></script>
+<script src="js/core/calculator.js"></script>
+<script src="js/tabs/profile.js"></script>
+<script src="js/tabs/tracker.js"></script>
+<script src="js/tabs/library.js"></script>
+<script src="js/tabs/planner.js"></script>
+<script src="js/tabs/exercises.js"></script>
+<script src="js/tabs/challenges.js"></script>
+<script src="js/tabs/insights.js"></script>
+<script src="js/tabs/guide.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+// ===== دوال مساعدة مضافة =====
+
+// إضافة وزن جديد
+function addWeightEntry() {
+  const w = parseFloat(document.getElementById('newWeightInput').value);
+  if (!w || w < 20 || w > 400) { toast('أدخل وزناً صحيحاً', 'warning'); return; }
+  S.profile = addWeightLog(S.profile, w);
+  S.profile = updateProfile(S.profile, {weight: w});
+  debouncedSave(S);
+  renderProfileTab();
+  document.getElementById('newWeightInput').value = '';
+  toast('تم تسجيل الوزن ✅', 'success');
+}
+
+// إضافة ماء
+function addWaterEntry(ml) {
+  const today = new Date().toISOString().split('T')[0];
+  const dayRecord = getDayRecord(S.tracker, today);
+  dayRecord.water = (dayRecord.water || 0) + ml;
+  debouncedSave(S);
+  updateTracker();
+  toast(`تم إضافة ${ml} مل 💧`, 'info');
+}
+
+// مسح اليوم
+function confirmClearDay() {
+  if (confirm('هل تريد مسح وجبات اليوم؟')) {
+    const today = new Date().toISOString().split('T')[0];
+    delete S.tracker[today];
+    debouncedSave(S);
+    updateTracker();
+    toast('تم مسح اليوم', 'info');
+  }
+}
+
+// فتح modal إضافة طعام
+function openAddFoodModal(mealType) {
+  window._currentMeal = mealType;
+  document.getElementById('addFoodModalTitle').textContent = 'إضافة طعام — ' + {breakfast:'الإفطار',lunch:'الغداء',dinner:'العشاء',snacks:'سناك'}[mealType];
+  document.getElementById('addFoodSearch').value = '';
+  document.getElementById('addFoodResults').innerHTML = '';
+  searchFoodsModal('');
+  document.getElementById('addFoodModal').classList.add('open');
+}
+
+// بحث في modal
+function searchFoodsModal(query) {
+  const foods = query.length > 1
+    ? getAllFoods().filter(f => f.name.includes(query)).slice(0, 30)
+    : getAllFoods().slice(0, 30);
+  
+  let html = '';
+  for (const f of foods) {
+    html += `<div class="food-item" style="cursor:pointer" onclick="addFoodToMealUI(${f.id})">
+      <span>${f.emoji||'🍴'} ${f.name}</span>
+      <span style="color:#10b981;font-size:12px">${f.kcal} سعرة</span>
+    </div>`;
+  }
+  document.getElementById('addFoodResults').innerHTML = html || '<p style="color:#9ca3af;text-align:center;padding:20px">لا نتائج</p>';
+}
+
+// إضافة طعام للوجبة
+function addFoodToMealUI(foodId) {
+  const food = getAllFoods().find(f => f.id === foodId);
+  if (!food) return;
+  const today = new Date().toISOString().split('T')[0];
+  const dayRecord = getDayRecord(S.tracker, today);
+  addFoodToMeal(dayRecord, window._currentMeal, {...food, quantity:1, weight:100});
+  debouncedSave(S);
+  closeModal('addFoodModal');
+  updateTracker();
+  toast(`تم إضافة ${food.name} ✅`, 'success');
+}
+
+// عرض تفاصيل طعام
+function openFoodModal(food) {
+  const html = `
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:48px">${food.emoji||'🍴'}</div>
+      <h3 style="color:#10b981">${food.name}</h3>
+      <p style="color:#9ca3af;font-size:12px">${food.cat||''}</p>
+    </div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="stat-card"><div class="stat-val">${food.kcal}</div><div class="stat-label">سعرة</div></div>
+      <div class="stat-card"><div class="stat-val">${food.p}</div><div class="stat-label">بروتين جم</div></div>
+      <div class="stat-card"><div class="stat-val">${food.c}</div><div class="stat-label">كارب جم</div></div>
+      <div class="stat-card"><div class="stat-val">${food.f}</div><div class="stat-label">دهون جم</div></div>
+    </div>
+    <div style="text-align:center">
+      <button class="btn" onclick="addFoodDirectly(${food.id}); closeModal('foodDetailModal')">+ إضافة للتتبع</button>
+    </div>`;
+  document.getElementById('foodDetailContent').innerHTML = html;
+  document.getElementById('foodDetailModal').classList.add('open');
+}
+
+function addFoodDirectly(foodId) {
+  const meals = ['breakfast','lunch','dinner','snacks'];
+  const hour = new Date().getHours();
+  const meal = hour < 10 ? 'breakfast' : hour < 15 ? 'lunch' : hour < 20 ? 'dinner' : 'snacks';
+  const food = getAllFoods().find(f => f.id === foodId);
+  if (!food) return;
+  const today = new Date().toISOString().split('T')[0];
+  addFoodToMeal(getDayRecord(S.tracker, today), meal, {...food, quantity:1, weight:100});
+  debouncedSave(S);
+  updateTracker();
+  toast(`تم إضافة ${food.name} ✅`, 'success');
+}
+
+// إغلاق modal
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// خطة جاهزة من MEAL_PLANS
+function loadReadyMadePlan() {
+  const kcal = S.profile.targetKcal || 1600;
+  const nearest = getNearestPlanKcal(kcal);
+  const dayIndex = Math.floor(Math.random() * 30);
+  let day = getPlanDay(nearest, dayIndex);
+  if (S.profile.dietProfile && day) {
+    day = applyDietProfile(day, S.profile.dietProfile);
+  }
+  if (!day) { toast('لا توجد خطة مناسبة', 'warning'); return; }
+  document.getElementById('planDetailsContainer').innerHTML = renderReadyPlanHTML(day, nearest);
+  toast(`تم تحميل خطة ${nearest} سعرة ✅`, 'success');
+}
+
+function renderReadyPlanHTML(day, kcal) {
+  const meals = [
+    {key:'wakeup',name:'🌅 الاستيقاظ'}, {key:'breakfast',name:'🍳 الإفطار'},
+    {key:'coffee',name:'☕ القهوة'}, {key:'snack1',name:'🍎 سناك 1'},
+    {key:'prelunch',name:'🥗 قبل الغداء'}, {key:'lunch',name:'🍽️ الغداء'},
+    {key:'snack2',name:'🥜 سناك 2'}, {key:'dinner',name:'🌙 العشاء'},
+    {key:'bedtime',name:'💊 قبل النوم'}
+  ];
+  let html = `<div class="card"><h3 style="color:#10b981;margin-bottom:14px">📅 خطة جاهزة — ${kcal} سعرة</h3>`;
+  for (const m of meals) {
+    if (day[m.key]) {
+      html += `<div class="plan-meal"><div class="plan-meal-name">${m.name}</div><div>${day[m.key]}</div></div>`;
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+// بحث في المكتبة
+document.addEventListener('DOMContentLoaded', () => {
+  const searchEl = document.getElementById('foodSearch');
+  if (searchEl) {
+    searchEl.addEventListener('input', (e) => {
+      const q = e.target.value.trim();
+      if (q.length > 0) searchFoods(q);
+      else filterFoods('all');
+    });
+  }
+  // إغلاق modals بالضغط خارجها
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.classList.remove('open');
+    });
+  });
+});
+</script>
+</body>
+</html>
