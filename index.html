@@ -199,7 +199,7 @@
   #drawer{
     position:fixed; top:0; bottom:0; left:0; width:min(420px, 92vw);
     background:var(--panel); border-right:1px solid var(--line); z-index:var(--z-drawer);
-    transform:translateX(-105%); transition:transform var(--transition-base) ease; display:flex; flex-direction:column;
+    transform:translateX(-105%); transition:transform var(--transition-base) var(--ease-standard); display:flex; flex-direction:column;
     box-shadow:var(--shadow-md);
   }
   #drawer.open{ transform:translateX(0); }
@@ -322,7 +322,18 @@
   #articlePreview p{ margin:var(--space-3) 0; }
   #articlePreview code{ background:var(--panel); padding:var(--space-odd-1) var(--space-odd-5); border-radius:var(--radius-xs); font-family:var(--font-mono); }
   #articlePreview a{ color:var(--accent-2); }
-  #newNodeOverlay{
+  /* ---- Component: Modal Overlay backdrop (shared base rule).
+     Purpose: full-screen dim backdrop behind any modal dialog.
+     Variants: none (all 4 current modals use the identical backdrop).
+     States: hidden (display:none, default) / shown (each modal keeps its own
+     existing show-trigger: some via .show{display:flex}, #newNodeOverlay via
+     direct style.display toggle in JS -- both untouched here, zero JS/HTML change).
+     Markup Contract: <div id="<name>Overlay"> as a direct child of <body>.
+     CSS Contract: this grouped selector is the single source of the backdrop look;
+     do not redeclare position/inset/background/z-index per-id again.
+     Usage: any NEW modal overlay should be added to this selector list instead of
+     duplicating the declaration block. ---- */
+  #newNodeOverlay, #analysisOverlay, #investigationOverlay, #researchOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:var(--z-modal);
   }
   #newNodeModal{
@@ -331,7 +342,7 @@
   }
   #newNodeModal h3{ margin:0 0 var(--space-7); font-size:var(--fs-lg); }
   #newNodeModal label{ font-size:var(--fs-sm); color:var(--muted); display:block; margin:var(--space-5) 0 var(--space-2); }
-  #newNodeModal input{
+  #newNodeModal input, #analysisModal input[type="text"], #analysisModal input[type="number"], #investigationModal input[type="text"]{
     width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
     padding:var(--space-odd-9) var(--space-6); border-radius:var(--radius-md); font-size:var(--fs-md); font-family:var(--font-body);
   }
@@ -360,7 +371,7 @@
     .layout{ position:relative; }
     #mobileAside{
       position:fixed; top:0; bottom:0; right:0; z-index:var(--z-mobile-aside); width:min(280px, 82vw);
-      transform:translateX(105%); transition:transform var(--transition-base) ease;
+      transform:translateX(105%); transition:transform var(--transition-base) var(--ease-standard);
       box-shadow:var(--shadow-md-rev);
     }
     #mobileAside.open{ transform:translateX(0); }
@@ -464,9 +475,6 @@
     padding:var(--space-4) var(--space-6); border-radius:var(--radius-md); cursor:pointer; font-size:var(--fs-base); font-family:var(--font-body);
   }
   .analysis-tools-btn:hover{ border-color:var(--accent-2); color:var(--accent-2); }
-  #analysisOverlay{
-    position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:var(--z-modal);
-  }
   #analysisOverlay.show{ display:flex; }
   #analysisModal{
     position:relative; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-xl);
@@ -474,10 +482,6 @@
   }
   #analysisModal h3{ margin:0 0 var(--space-7); font-size:var(--fs-lg); }
   #analysisModal label{ font-size:var(--fs-sm); color:var(--muted); display:block; margin:var(--space-6) 0 var(--space-2); }
-  #analysisModal input[type="text"], #analysisModal input[type="number"]{
-    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
-    padding:var(--space-odd-9) var(--space-6); border-radius:var(--radius-md); font-size:var(--fs-md); font-family:var(--font-body);
-  }
   .analysis-hint{ font-size:var(--fs-sm-alt); color:var(--muted); line-height:1.6; margin:0 0 var(--space-6); }
   .analysis-tabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:var(--space-8); border-bottom:1px solid var(--line); padding-bottom:var(--space-7); }
   .analysis-tab{
@@ -535,9 +539,6 @@
   #drawer.reading-mode #readingModeExit{ display:block; }
 
   /* ============ المرحلة 4: التحقيق والمسارات ============ */
-  #investigationOverlay{
-    position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:var(--z-modal);
-  }
   #investigationOverlay.show{ display:flex; }
   #investigationModal{
     position:relative; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-xl);
@@ -545,10 +546,6 @@
   }
   #investigationModal h3{ margin:0 0 var(--space-7); font-size:var(--fs-lg); }
   #investigationModal label{ font-size:var(--fs-sm); color:var(--muted); display:block; margin:var(--space-6) 0 var(--space-2); }
-  #investigationModal input[type="text"]{
-    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
-    padding:var(--space-odd-9) var(--space-6); border-radius:var(--radius-md); font-size:var(--fs-md); font-family:var(--font-body);
-  }
   .bookmark-btn{
     position:absolute; top:var(--space-8); left:calc(var(--space-8) + 40px);
     background:none; border:1px solid var(--line); color:var(--muted); font-size:18px; line-height:1;
@@ -624,9 +621,6 @@
   #relationshipInspector .ri-evidence a{ color:var(--accent-2); font-size:var(--fs-xs); }
 
   /* ============ ميزة البحث الخارجي المدمج (Research Assist) ============ */
-  #researchOverlay{
-    position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:var(--z-modal);
-  }
   #researchOverlay.show{ display:flex; }
   #researchModal{
     position:relative; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-xl);
