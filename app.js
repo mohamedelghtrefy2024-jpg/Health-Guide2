@@ -62,7 +62,9 @@ function renderCatList(){
     div.setAttribute('tabindex', '0');
     div.setAttribute('aria-pressed', String(isActive));
     div.setAttribute('aria-label', `فلترة حسب فئة ${cat}، ${count} عقدة`);
-    div.innerHTML = `<span class="dot" style="background:${CAT_COLORS[cat]||'#666'}"></span><span>${cat}</span><span class="cat-count">${count}</span><button class="cat-graph-btn" title="عرض كشبكة تفاعلية" aria-label="عرض فئة ${cat} كشبكة تفاعلية">🕸️</button>`;
+    // ---- Stage 5 / item 2: فلترة مركّبة — checkbox لاختيار/استبعاد الفئة دون التأثير على باقي الفئات المختارة ----
+    const checked = activeCats.has(cat);
+    div.innerHTML = `<input type="checkbox" class="cat-checkbox" ${checked?'checked':''} title="تضمين/استبعاد ${cat} من العرض دون التأثير على باقي الفئات المختارة" aria-label="تضمين فئة ${cat}"><span class="dot" style="background:${CAT_COLORS[cat]||'#666'}"></span><span>${cat}</span><span class="cat-count">${count}</span><button class="cat-graph-btn" title="عرض كشبكة تفاعلية" aria-label="عرض فئة ${cat} كشبكة تفاعلية">🕸️</button>`;
     div.querySelector('span:nth-child(2)').parentElement.onclick = null;
     const activateCat = ()=>{
       if(activeCats.size===1 && activeCats.has(cat)){
@@ -73,6 +75,14 @@ function renderCatList(){
       renderCatList(); renderMainView();
       closeAsideMenu();
     };
+    const checkboxEl = div.querySelector('.cat-checkbox');
+    checkboxEl.onclick = (e)=> e.stopPropagation();
+    checkboxEl.onchange = ()=>{
+      if(checkboxEl.checked) activeCats.add(cat);
+      else activeCats.delete(cat);
+      if(activeCats.size===0) activeCats = new Set(CATS); // لا يُسمح بعرض فارغ تمامًا — رجوع تلقائي لكل الفئات
+      renderCatList(); renderMainView();
+    };
     div.onclick = (e)=>{
       if(e.target.classList.contains('cat-graph-btn')){
         activeCats = new Set([cat]);
@@ -81,6 +91,7 @@ function renderCatList(){
         closeAsideMenu();
         return;
       }
+      if(e.target === checkboxEl) return;
       activateCat();
     };
     div.onkeydown = (e)=>{
@@ -323,7 +334,8 @@ const noteTagsRow = document.getElementById('noteTagsRow');
 let currentNode = null;
 let saveTimer = null;
 
-function openNode(node, pushHistory){
+function openNode(node, pushHistory, opts){
+  opts = opts || {};
   currentNode = node;
   if(pushHistory){
     history = history.slice(0, historyPos+1);
@@ -331,6 +343,9 @@ function openNode(node, pushHistory){
     historyPos = history.length - 1;
   }
   updateNavButtons();
+  // ---- Stage 4 / items 1+2: تتبّع "شوهد مؤخرًا" ومزامنة رابط الصفحة (deep link) ----
+  if(typeof pushRecent === 'function') pushRecent(node.id);
+  if(!opts.skipUrlUpdate && typeof updateUrlForNode === 'function') updateUrlForNode(node);
   dCat.innerHTML = node.category + (node.epistemicStatus ? epistemicBadgeHtml(node.epistemicStatus) : '');
   dCat.style.color = CAT_COLORS[node.category] || '#8b909c';
   dName.textContent = getDisplayName(node.name);
@@ -375,6 +390,8 @@ function openNode(node, pushHistory){
   loadNotes(node.id);
   renderNoteTags(node);
   renderBreadcrumbs();
+  if(typeof refreshBookmarkBtn === 'function') refreshBookmarkBtn();
+  if(typeof refreshAddToPathBtn === 'function') refreshAddToPathBtn();
   overlay.style.display = 'block';
   drawer.classList.add('open');
 }
@@ -423,6 +440,38 @@ addSourceBtn.onclick = async ()=>{
   newSourceUrl.value = '';
   renderSources(currentNode);
 };
+function escapeRegex(str){ return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+// ---- ربط تلقائي: أي ذكر لاسم عقدة موجودة جوه نص حر (ملخص Hub، تفسير علاقة...) بيتحول لينك قابل للضغط ----
+let nodeNameMatcher = null;
+let nodeByExactName = null;
+function buildNodeNameMatcher(){
+  nodeByExactName = new Map();
+  nodes.forEach(n=>{ if(!nodeByExactName.has(n.name)) nodeByExactName.set(n.name, n); });
+  const names = [...nodeByExactName.keys()]
+    .filter(n=> n.trim().length >= 2) // تجاهل أسماء قصيرة جدًا (تقليل تطابقات وهمية)
+    .sort((a,b)=> b.length - a.length); // الأطول أولًا، عشان "13.4.4.1" متتقفش قبل "13.4.4.1.1"
+  nodeNameMatcher = new RegExp('(' + names.map(escapeRegex).join('|') + ')', 'g');
+}
+function linkifyNodeMentions(rawText, excludeId){
+  if(!rawText) return '';
+  if(!nodeNameMatcher) buildNodeNameMatcher();
+  return rawText.split(nodeNameMatcher).map(part=>{
+    if(!part) return '';
+    const n = nodeByExactName.get(part);
+    if(n && n.id !== excludeId) return `<a href="#" class="node-mention" data-node-id="${n.id}">${escapeHtml(part)}</a>`;
+    return escapeHtml(part);
+  }).join('');
+}
+// تفويض ضغط واحد على مستوى المستند لأي لينك node-mention، أينما ظهر (ملخص Hub، مفتش العلاقات...)
+document.addEventListener('click', (e)=>{
+  const a = e.target.closest && e.target.closest('.node-mention');
+  if(!a) return;
+  e.preventDefault();
+  const n = nodes.find(x=>x.id===Number(a.dataset.nodeId));
+  if(n) openNode(n, true);
+});
+
 // ---- Stage 3 / item 4: Hub Summary (hubSummary: string, optional, hubs only) ----
 function renderHubSummary(node){
   const childCount = hubChildCounts[node.name] || 0;
@@ -437,7 +486,7 @@ function renderHubSummary(node){
   const summary = node.hubSummary || '';
   hubSummaryLabel.style.display = (summary || inEdit) ? 'block' : 'none';
   hubSummaryView.style.display = summary ? 'block' : 'none';
-  hubSummaryView.textContent = summary;
+  hubSummaryView.innerHTML = linkifyNodeMentions(summary, node.id);
   hubSummaryEditRow.style.display = inEdit ? 'flex' : 'none';
   if(inEdit) hubSummaryInput.value = summary;
 }
@@ -579,6 +628,52 @@ async function migrateLegacyNoteIfNeeded(id){
     }
   }catch(e){ /* لا يوجد سجل قديم أو البيئة لا تدعمه — تجاهل بصمت */ }
   return null;
+}
+
+// ---- BUGFIX (قبل المرحلة 4): تخزين عام مبني على IndexedDB الحقيقي بدل window.storage ----
+// window.storage هو API خاص ببيئة معاينة Artifacts في Claude.ai فقط، وغير موجود إطلاقًا على أي
+// استضافة حقيقية (GitHub Pages وغيرها). كل استدعاءات window.storage.get/set كانت بتفشل بصمت
+// (try/catch يبلعها) على الموقع الفعلي، يعني كل الـ overrides دي (عقد مُضافة، تعديل فئة، روابط
+// إضافية، مصادر، ملخص Hub، فهرس الوسوم) كانت بتتفقد فور ما المستخدم يقفل المتصفح على الاستضافة
+// الحقيقية رغم إنها بتبان شغالة في نفس الجلسة. الإصلاح: استخدام نفس الـ IndexedDB الحقيقي
+// (STORE_NAME='notes', keyPath='id') كمخزن عام مفتاح/قيمة، بنفس مفاتيح "meta:..." المستخدمة قبل كده.
+async function idbGet(key){
+  const db = await openDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const req = tx.objectStore(STORE_NAME).get(key);
+    req.onsuccess = ()=> resolve(req.result ? req.result.value : null);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbSet(key, value){
+  const db = await openDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put({ id: key, value });
+    tx.oncomplete = ()=> resolve(true);
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+// غلاف بنفس شكل واجهة window.storage القديمة ({value}) عشان الكود الحالي يفضل شغال بأقل تعديل ممكن،
+// لكن مبني على IndexedDB الحقيقي بدل الاعتماد على بيئة Artifacts.
+const localStore = {
+  async get(key){ const value = await idbGet(key); return value == null ? null : { value }; },
+  async set(key, value){ await idbSet(key, value); return { value }; }
+};
+// محاولة ترحيل أي بيانات meta: كانت اتخزنت سابقًا عبر window.storage (لو الملف اتفتح قبل كده
+// في معاينة Artifacts) لنفس المفاتيح داخل IndexedDB الحقيقي، مرة واحدة بس.
+async function migrateLegacyMetaIfNeeded(){
+  if(!window.storage || typeof window.storage.get !== 'function') return;
+  const keys = ['meta:customNodes','meta:categoryOverrides','meta:extraLinks','meta:sourcesOverrides','meta:hubSummaryOverrides','meta:noteTagIndex','meta:edgeMetaOverrides','meta:bookmarks','meta:recentlyViewed','meta:investigationPath'];
+  for(const k of keys){
+    try{
+      const existing = await idbGet(k);
+      if(existing != null) continue; // موجود بالفعل في IndexedDB الحقيقي، متلمسوش
+      const legacy = await window.storage.get(k);
+      if(legacy && legacy.value != null) await idbSet(k, legacy.value);
+    }catch(e){ /* تجاهل بصمت */ }
+  }
 }
 
 // ---- notes persistence ----
@@ -785,7 +880,15 @@ function renderForceGraph(gNodes, gLinks, primaryIds){
     .data(linksCopy).join('line')
     .attr('class', 'glink')
     .attr('stroke-dasharray', d => (d.source.isBridge || d.target.isBridge) ? '3,3' : null)
-    .attr('opacity', d => (d.source.isBridge || d.target.isBridge) ? 0.45 : 0.9);
+    .attr('opacity', d => (d.source.isBridge || d.target.isBridge) ? 0.45 : 0.9)
+    // ---- Stage 6: تلوين/سُمك اختياريان حسب edgeMeta (فاضي افتراضيًا = صفر تغيير بصري) ----
+    .attr('stroke', d=>{ const m = edgeMetaFor(d); return (m && EDGE_TYPE_COLORS[m.type]) ? EDGE_TYPE_COLORS[m.type] : null; })
+    .attr('stroke-width', d=>{ const m = edgeMetaFor(d); return (m && m.strength && EDGE_STRENGTH_WIDTH[m.strength]) ? EDGE_STRENGTH_WIDTH[m.strength] : null; })
+    .style('cursor', d=> edgeMetaFor(d) ? 'pointer' : null)
+    .on('click', (event, d)=>{
+      const m = edgeMetaFor(d);
+      if(m){ event.stopPropagation(); openRelationshipInspector(d.source.name, d.target.name, m); }
+    });
 
   const gnode = zoomLayer.append('g').selectAll('g')
     .data(nodesCopy).join('g').attr('class', 'gnode')
@@ -1155,15 +1258,16 @@ const moveCatSelect = document.getElementById('moveCatSelect');
 const linkBtn = document.getElementById('linkBtn');
 
 async function loadOverlayMeta(){
+  await migrateLegacyMetaIfNeeded();
   try{
-    const r = await window.storage.get('meta:customNodes');
+    const r = await localStore.get('meta:customNodes');
     if(r && r.value){
       const custom = JSON.parse(r.value);
       custom.forEach(n=>{ nodes.push(n); nameIndex[n.name.trim()] = n; });
     }
   }catch(e){}
   try{
-    const r = await window.storage.get('meta:categoryOverrides');
+    const r = await localStore.get('meta:categoryOverrides');
     if(r && r.value){
       const overrides = JSON.parse(r.value);
       Object.keys(overrides).forEach(id=>{
@@ -1173,7 +1277,7 @@ async function loadOverlayMeta(){
     }
   }catch(e){}
   try{
-    const r = await window.storage.get('meta:extraLinks');
+    const r = await localStore.get('meta:extraLinks');
     if(r && r.value){
       const links = JSON.parse(r.value);
       links.forEach(([a,b])=>{
@@ -1186,7 +1290,7 @@ async function loadOverlayMeta(){
     }
   }catch(e){}
   try{
-    const r = await window.storage.get('meta:sourcesOverrides');
+    const r = await localStore.get('meta:sourcesOverrides');
     if(r && r.value){
       const overrides = JSON.parse(r.value);
       Object.keys(overrides).forEach(id=>{
@@ -1196,7 +1300,7 @@ async function loadOverlayMeta(){
     }
   }catch(e){}
   try{
-    const r = await window.storage.get('meta:hubSummaryOverrides');
+    const r = await localStore.get('meta:hubSummaryOverrides');
     if(r && r.value){
       const overrides = JSON.parse(r.value);
       Object.keys(overrides).forEach(id=>{
@@ -1206,59 +1310,248 @@ async function loadOverlayMeta(){
     }
   }catch(e){}
   try{
-    const r = await window.storage.get('meta:noteTagIndex');
+    const r = await localStore.get('meta:noteTagIndex');
     if(r && r.value){
       noteTagIndex = JSON.parse(r.value);
     }
   }catch(e){}
 }
 
+async function loadEdgeMetaOverrides(){
+  try{
+    const r = await localStore.get('meta:edgeMetaOverrides');
+    if(r && r.value){
+      const overrides = JSON.parse(r.value);
+      window.EDGE_META = Object.assign({}, window.EDGE_META, overrides);
+    }
+  }catch(e){}
+}
+async function saveEdgeMetaOverride(key, meta){
+  let overrides = {};
+  try{
+    const r = await localStore.get('meta:edgeMetaOverrides');
+    if(r && r.value) overrides = JSON.parse(r.value);
+  }catch(e){}
+  overrides[key] = meta;
+  await localStore.set('meta:edgeMetaOverrides', JSON.stringify(overrides));
+  window.EDGE_META[key] = meta;
+}
+
+// ============================================================
+// ميزة "جهّز طلب بحث" — ربط بحث خارجي (Claude + بحث الويب) بالعقدة الحالية
+// ============================================================
+// ملاحظة تصميم مهمة: التطبيق ده ملف ثابت (GitHub Pages)، مفيش سيرفر خلفي وماينفعش نحط مفتاح
+// Anthropic API جوه كود JS ظاهر للجميع في المتصفح (أي حد فاتح "عرض المصدر" هياخده). فالحل الآمن
+// والعملي: التطبيق بيجهّز "طلب بحث" كامل السياق (اسم العقدة، فئتها، روابطها الحالية، وفهرس بكل
+// أسماء العقد التانية عشان الموديل يقدر يكتشف روابط حقيقية بينها)، المستخدم يلزقه في محادثة Claude
+// عادية فيها بحث الويب، وبعدين يلزق الرد هنا — والتطبيق بيتحقق ويعاين قبل ما يطبّق أي تغيير فعلي.
+function buildResearchPrompt(node){
+  const existingConn = (node.connections||[]).join('، ') || 'لا يوجد';
+  const existingSources = Array.isArray(node.sources) && node.sources.length
+    ? node.sources.map(s=> `- ${s.label} — ${s.url}`).join('\n')
+    : '(لا يوجد)';
+  const existingSummary = node.hubSummary ? node.hubSummary : '(لا يوجد)';
+  const byCat = {};
+  nodes.forEach(n=>{ (byCat[n.category] = byCat[n.category]||[]).push(`${n.name} [#${n.id}]`); });
+  const indexText = Object.keys(byCat).sort().map(cat=> `### ${cat}\n${byCat[cat].join(' | ')}`).join('\n\n');
+
+  return `أنت باحث توثيقي دقيق. مطلوب منك بحث حقيقي على الويب عن الموضوع التالي، بدون اختراع أي معلومة أو مصدر.
+
+## العقدة المطلوب البحث عنها
+الاسم: ${node.name}
+الفئة: ${node.category}
+الروابط الحالية المسجّلة يدويًا: ${existingConn}
+الملخص الحالي (لو موجود): ${existingSummary}
+المصادر الحالية (لو موجودة):
+${existingSources}
+
+## المطلوب بالظبط
+1. ابحث فعليًا على الويب عن هذا الموضوع (لو مش قادر تبحث، قول كده صراحة ومتكملش).
+2. اكتب ملخصًا (hubSummary) بالعربية، 150-300 كلمة، دقيق ومحايد. لو الموضوع نظرية أو ادّعاء غير مثبت علميًا/تاريخيًا، وضّح ده صراحة في الملخص نفسه بدل ما تقدّمه كحقيقة مؤكدة.
+3. اذكر 2-6 مصادر حقيقية فقط (روابط قابلة للتحقق فعلًا من نتائج بحثك). ممنوع اختراع أي رابط أو عنوان.
+4. من "فهرس العقد الموجودة بالفعل" تحت، حدد فقط الأسماء اللي لقيت رابطًا حقيقيًا وموثّقًا بينها وبين "${node.name}" استنادًا لنتائج بحثك — مش بمجرد تشابه الاسم أو التخمين. لكل رابط مقترح اكتب: الاسم بالظبط زي ما هو مكتوب في الفهرس (بما فيه رقم الـ #)، وسبب الربط باختصار، ونوعه (اختر واحد: organizational, historical, thematic, evidence, opposing, alias)، وقوته (weak, medium, strong).
+5. لو مفيش معلومات موثوقة كافية عن الموضوع، رجّع hubSummary وsources فاضيين ووضّح السبب، وماتخترعش حاجة.
+
+## فهرس العقد الموجودة بالفعل (للربط بينها وبين الموضوع فقط، مش للبحث عنها)
+${indexText}
+
+## صيغة الرد المطلوبة (JSON فقط، بدون أي نص تاني قبله أو بعده)
+{
+  "hubSummary": "نص الملخص هنا أو فاضي",
+  "sources": [{"label": "اسم المصدر", "url": "https://..."}],
+  "suggestedConnections": [
+    {"targetName": "الاسم بالظبط من الفهرس مع رقم الـ#", "reason": "سبب الربط المكتشف من البحث", "type": "thematic", "strength": "medium"}
+  ]
+}`;
+}
+
+const researchOverlay = document.getElementById('researchOverlay');
+const researchNodeBtnEl = document.getElementById('researchNodeBtn');
+const researchPromptOut = document.getElementById('researchPromptOut');
+const researchImportIn = document.getElementById('researchImportIn');
+const researchPreviewEl = document.getElementById('researchPreview');
+let lastResearchParsed = null;
+
+function openResearchModal(){
+  if(!researchOverlay || !currentNode) return;
+  researchPromptOut.value = buildResearchPrompt(currentNode);
+  researchImportIn.value = '';
+  researchPreviewEl.innerHTML = '';
+  lastResearchParsed = null;
+  researchOverlay.classList.add('show');
+}
+function closeResearchModal(){ if(researchOverlay) researchOverlay.classList.remove('show'); }
+if(researchNodeBtnEl) researchNodeBtnEl.onclick = openResearchModal;
+const closeResearchBtn = document.getElementById('closeResearch');
+if(closeResearchBtn) closeResearchBtn.onclick = closeResearchModal;
+if(researchOverlay) researchOverlay.onclick = (e)=>{ if(e.target===researchOverlay) closeResearchModal(); };
+
+const copyResearchPromptBtn = document.getElementById('copyResearchPromptBtn');
+if(copyResearchPromptBtn){
+  copyResearchPromptBtn.onclick = async ()=>{
+    try{
+      await navigator.clipboard.writeText(researchPromptOut.value);
+      copyResearchPromptBtn.textContent = '✅ اتنسخ';
+      setTimeout(()=> copyResearchPromptBtn.textContent = '📋 نسخ النص', 1500);
+    }catch(e){
+      researchPromptOut.select();
+      document.execCommand && document.execCommand('copy');
+    }
+  };
+}
+
+function parseResearchJson(text){
+  text = (text||'').trim();
+  // إزالة أي ```json fences لو المستخدم لصقها زي ما هي من الرد
+  text = text.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
+  let parsed;
+  try{ parsed = JSON.parse(text); }
+  catch(e){ throw new Error('الـ JSON مش صحيح — تأكد إنك لاصق رد Claude كامل بدون نص إضافي حواليه.'); }
+  if(typeof parsed !== 'object' || parsed===null) throw new Error('شكل البيانات غير متوقع.');
+  return parsed;
+}
+
+const previewResearchBtn = document.getElementById('previewResearchBtn');
+if(previewResearchBtn){
+  previewResearchBtn.onclick = ()=>{
+    let parsed;
+    try{ parsed = parseResearchJson(researchImportIn.value); }
+    catch(e){ researchPreviewEl.innerHTML = `<div class="rp-block" style="color:#e0674f;">${escapeHtml(e.message)}</div>`; return; }
+
+    const summary = typeof parsed.hubSummary === 'string' ? parsed.hubSummary.trim() : '';
+    const sources = Array.isArray(parsed.sources) ? parsed.sources.filter(s=> s && s.url && isSafeUrl(s.url)) : [];
+    const suggestions = Array.isArray(parsed.suggestedConnections) ? parsed.suggestedConnections : [];
+
+    const matched = suggestions.map(s=>{
+      const raw = (s.targetName||'').trim();
+      const idMatch = raw.match(/#(\d+)/);
+      let target = idMatch ? nodes.find(n=>n.id===Number(idMatch[1])) : null;
+      if(!target) target = nodes.find(n=> n.name.trim() === raw.replace(/\s*\[#\d+\]\s*$/,'').trim());
+      return { ...s, target };
+    });
+
+    lastResearchParsed = { summary, sources, matched };
+
+    let html = '';
+    html += `<div class="rp-block"><h4>الملخص</h4>${summary ? escapeHtml(summary) : '<em style="color:var(--muted)">فاضي</em>'}</div>`;
+    html += `<div class="rp-block"><h4>المصادر (${sources.length})</h4>${sources.length ? sources.map(s=>`<div>• ${escapeHtml(s.label||s.url)}</div>`).join('') : '<em style="color:var(--muted)">لا يوجد</em>'}</div>`;
+    html += `<div class="rp-block"><h4>روابط مقترحة (${matched.length})</h4>`;
+    if(!matched.length){
+      html += '<em style="color:var(--muted)">لا يوجد</em>';
+    } else {
+      html += matched.map((m,i)=>{
+        const unmatchedCls = m.target ? '' : ' rp-unmatched';
+        const label = m.target ? getDisplayName(m.target.name) : `${m.targetName} (⚠️ لم يتم إيجاد عقدة مطابقة بهذا الاسم بالضبط)`;
+        return `<label class="rp-conn-row${unmatchedCls}">
+          <input type="checkbox" class="rp-conn-check" data-idx="${i}" ${m.target ? 'checked':'disabled'}>
+          <span>${escapeHtml(label)}<br><span class="rp-conn-reason">${escapeHtml(m.reason||'')} — ${escapeHtml(m.type||'')}/${escapeHtml(m.strength||'')}</span></span>
+        </label>`;
+      }).join('');
+    }
+    html += '</div>';
+    html += `<div class="rp-apply-actions"><button id="applyResearchBtn" class="analysis-primary-btn">✅ طبّق على العقدة الحالية</button></div>`;
+    researchPreviewEl.innerHTML = html;
+
+    document.getElementById('applyResearchBtn').onclick = applyResearchResults;
+  };
+}
+
+async function applyResearchResults(){
+  if(!lastResearchParsed || !currentNode) return;
+  const { summary, sources, matched } = lastResearchParsed;
+  if(summary) await saveHubSummaryOverride(currentNode.id, summary);
+  if(sources.length){
+    const existing = Array.isArray(currentNode.sources) ? currentNode.sources : [];
+    const merged = existing.slice();
+    sources.forEach(s=>{ if(!merged.some(e=>e.url===s.url)) merged.push({ label: s.label||s.url, url: s.url }); });
+    await saveSourcesOverride(currentNode.id, merged);
+    currentNode.sources = merged;
+  }
+  const checks = researchPreviewEl.querySelectorAll('.rp-conn-check:checked');
+  for(const chk of checks){
+    const m = matched[Number(chk.dataset.idx)];
+    if(!m || !m.target) continue;
+    await saveExtraLink(currentNode.id, m.target.id);
+    const key = edgeMetaKey(currentNode.name, m.target.name);
+    await saveEdgeMetaOverride(key, {
+      type: m.type || 'thematic',
+      strength: m.strength || 'medium',
+      explanation: m.reason || '',
+      evidence: sources.map(s=>({ label:s.label, url:s.url }))
+    });
+    if(!currentNode.connections.includes(m.target.name)) currentNode.connections.push(m.target.name);
+  }
+  if(summary) currentNode.hubSummary = summary;
+  closeResearchModal();
+  openNode(currentNode, false, { skipUrlUpdate:true }); // إعادة رسم الـ drawer بالبيانات الجديدة
+}
+
 async function saveCustomNodes(){
   const custom = nodes.filter(n=>n.custom);
-  await window.storage.set('meta:customNodes', JSON.stringify(custom));
+  await localStore.set('meta:customNodes', JSON.stringify(custom));
 }
 async function saveCategoryOverrides(id, cat){
   let overrides = {};
   try{
-    const r = await window.storage.get('meta:categoryOverrides');
+    const r = await localStore.get('meta:categoryOverrides');
     if(r && r.value) overrides = JSON.parse(r.value);
   }catch(e){}
   overrides[id] = cat;
-  await window.storage.set('meta:categoryOverrides', JSON.stringify(overrides));
+  await localStore.set('meta:categoryOverrides', JSON.stringify(overrides));
 }
 async function saveSourcesOverride(id, sources){
   let overrides = {};
   try{
-    const r = await window.storage.get('meta:sourcesOverrides');
+    const r = await localStore.get('meta:sourcesOverrides');
     if(r && r.value) overrides = JSON.parse(r.value);
   }catch(e){}
   if(sources && sources.length) overrides[id] = sources;
   else delete overrides[id];
-  await window.storage.set('meta:sourcesOverrides', JSON.stringify(overrides));
+  await localStore.set('meta:sourcesOverrides', JSON.stringify(overrides));
 }
 async function saveHubSummaryOverride(id, text){
   let overrides = {};
   try{
-    const r = await window.storage.get('meta:hubSummaryOverrides');
+    const r = await localStore.get('meta:hubSummaryOverrides');
     if(r && r.value) overrides = JSON.parse(r.value);
   }catch(e){}
   if(text) overrides[id] = text;
   else delete overrides[id];
-  await window.storage.set('meta:hubSummaryOverrides', JSON.stringify(overrides));
+  await localStore.set('meta:hubSummaryOverrides', JSON.stringify(overrides));
 }
 async function saveNoteTagIndexEntry(id, tags){
   if(tags && tags.length) noteTagIndex[id] = tags;
   else delete noteTagIndex[id];
-  await window.storage.set('meta:noteTagIndex', JSON.stringify(noteTagIndex));
+  await localStore.set('meta:noteTagIndex', JSON.stringify(noteTagIndex));
 }
 async function saveExtraLink(aId, bId){
   let links = [];
   try{
-    const r = await window.storage.get('meta:extraLinks');
+    const r = await localStore.get('meta:extraLinks');
     if(r && r.value) links = JSON.parse(r.value);
   }catch(e){}
   links.push([aId, bId]);
-  await window.storage.set('meta:extraLinks', JSON.stringify(links));
+  await localStore.set('meta:extraLinks', JSON.stringify(links));
 }
 
 function refreshCatDropdowns(){
@@ -1627,6 +1920,456 @@ if(runSuggestBtn){
   };
 }
 
+// ============================================================
+// المرحلة 4 — التحقيق والمسارات (Investigation Path — نسخة مصغّرة)
+// كل التخزين هنا مبني على نفس نمط IndexedDB الحقيقي (localStore) المستخدم فعليًا في الملاحظات،
+// صفر تغيير في nodes.json أو بنية العقدة — كل البيانات دي overlay منفصل تمامًا.
+// ============================================================
+
+// ---- item 1: مفضلة (Bookmarks) + شوهد مؤخرًا ----
+let bookmarkIds = new Set();
+let recentIds = [];
+async function loadBookmarksAndRecent(){
+  try{
+    const r = await localStore.get('meta:bookmarks');
+    if(r && r.value) bookmarkIds = new Set(JSON.parse(r.value));
+  }catch(e){}
+  try{
+    const r = await localStore.get('meta:recentlyViewed');
+    if(r && r.value) recentIds = JSON.parse(r.value);
+  }catch(e){}
+}
+async function saveBookmarks(){ await localStore.set('meta:bookmarks', JSON.stringify([...bookmarkIds])); }
+async function pushRecent(id){
+  recentIds = recentIds.filter(x=>x!==id);
+  recentIds.unshift(id);
+  if(recentIds.length > 30) recentIds = recentIds.slice(0,30);
+  await localStore.set('meta:recentlyViewed', JSON.stringify(recentIds));
+}
+
+const bookmarkBtnEl = document.getElementById('bookmarkBtn');
+function refreshBookmarkBtn(){
+  if(!bookmarkBtnEl || !currentNode) return;
+  const on = bookmarkIds.has(currentNode.id);
+  bookmarkBtnEl.textContent = on ? '★' : '☆';
+  bookmarkBtnEl.setAttribute('aria-pressed', String(on));
+}
+if(bookmarkBtnEl){
+  bookmarkBtnEl.onclick = async ()=>{
+    if(!currentNode) return;
+    if(bookmarkIds.has(currentNode.id)) bookmarkIds.delete(currentNode.id);
+    else bookmarkIds.add(currentNode.id);
+    await saveBookmarks();
+    refreshBookmarkBtn();
+  };
+}
+
+function nodeListRowHtml(n, extraMetaText){
+  return `<div class="analysis-node-row" data-node-id="${n.id}">
+    <span>${getDisplayName(n.name)} <span style="color:var(--muted); font-size:11px;">(${n.category})</span></span>
+    ${extraMetaText ? `<span class="anr-meta">${extraMetaText}</span>` : ''}
+  </div>`;
+}
+function wireNodeListRows(container){
+  container.querySelectorAll('[data-node-id]').forEach(row=>{
+    row.onclick = ()=>{
+      const n = nodes.find(x=>x.id===Number(row.dataset.nodeId));
+      if(n){ closeInvestigationModal(); openNode(n, true); }
+    };
+  });
+}
+
+function renderBookmarksList(){
+  const el = document.getElementById('bookmarksList');
+  if(!el) return;
+  const list = [...bookmarkIds].map(id=> nodes.find(n=>n.id===id)).filter(Boolean);
+  el.innerHTML = list.length
+    ? list.map(n=> nodeListRowHtml(n)).join('')
+    : '<div class="analysis-empty">لسه مفيش عقد في المفضلة. افتح أي عقدة واضغط ☆ بجانب اسمها.</div>';
+  wireNodeListRows(el);
+}
+function renderRecentList(){
+  const el = document.getElementById('recentList');
+  if(!el) return;
+  const list = recentIds.map(id=> nodes.find(n=>n.id===id)).filter(Boolean);
+  el.innerHTML = list.length
+    ? list.map(n=> nodeListRowHtml(n)).join('')
+    : '<div class="analysis-empty">لسه مفيش عقد اتفتحت في هذه الجلسة.</div>';
+  wireNodeListRows(el);
+}
+
+// ---- item 2: Deep Linking (?node=<id>) ----
+function updateUrlForNode(node){
+  try{
+    const url = new URL(window.location.href);
+    url.searchParams.set('node', node.id);
+    window.history.pushState({ nodeId: node.id }, '', url);
+  }catch(e){ /* بيئات نادرة بدون History API — تجاهل بصمت، الميزة اختيارية */ }
+}
+function tryOpenNodeFromUrl(){
+  const idParam = new URLSearchParams(window.location.search).get('node');
+  if(!idParam) return false;
+  const n = nodes.find(x=>x.id===Number(idParam));
+  if(n){ openNode(n, true, { skipUrlUpdate:true }); return true; }
+  return false;
+}
+window.addEventListener('popstate', ()=>{
+  const idParam = new URLSearchParams(window.location.search).get('node');
+  if(idParam){
+    const n = nodes.find(x=>x.id===Number(idParam));
+    if(n) openNode(n, false, { skipUrlUpdate:true });
+  } else {
+    closeDrawer();
+  }
+});
+
+// ---- item 3: مسار تحقيق واحد نشط ----
+let investigationPath = { name:'', question:'', nodeIds:[] };
+async function loadInvestigationPath(){
+  try{
+    const r = await localStore.get('meta:investigationPath');
+    if(r && r.value) investigationPath = Object.assign({name:'',question:'',nodeIds:[]}, JSON.parse(r.value));
+  }catch(e){}
+}
+async function saveInvestigationPathData(){ await localStore.set('meta:investigationPath', JSON.stringify(investigationPath)); }
+
+const addToPathBtnEl = document.getElementById('addToPathBtn');
+function refreshAddToPathBtn(){
+  if(!addToPathBtnEl || !currentNode) return;
+  const already = investigationPath.nodeIds.includes(currentNode.id);
+  addToPathBtnEl.disabled = already;
+  addToPathBtnEl.textContent = already ? '✓ مُضافة لمسار التحقيق' : '➕ أضف لمسار التحقيق';
+}
+if(addToPathBtnEl){
+  addToPathBtnEl.onclick = async ()=>{
+    if(!currentNode || investigationPath.nodeIds.includes(currentNode.id)) return;
+    investigationPath.nodeIds.push(currentNode.id);
+    await saveInvestigationPathData();
+    refreshAddToPathBtn();
+    renderPathNodesList();
+  };
+}
+
+function renderPathNodesList(){
+  const el = document.getElementById('pathNodesList');
+  if(!el) return;
+  const pathNodeNameInput = document.getElementById('pathNameInput');
+  const pathQuestionInputEl = document.getElementById('pathQuestionInput');
+  if(pathNodeNameInput) pathNodeNameInput.value = investigationPath.name || '';
+  if(pathQuestionInputEl) pathQuestionInputEl.value = investigationPath.question || '';
+  if(!investigationPath.nodeIds.length){
+    el.innerHTML = '<div class="analysis-empty">لسه مفيش عقد في المسار. افتح أي عقدة واضغط "أضف لمسار التحقيق".</div>';
+    return;
+  }
+  el.innerHTML = investigationPath.nodeIds.map((id, idx)=>{
+    const n = nodes.find(x=>x.id===id);
+    if(!n) return '';
+    return `<div class="path-node-row" data-node-id="${id}">
+      <span class="path-node-name">${idx+1}. ${getDisplayName(n.name)}</span>
+      <span class="path-node-actions">
+        <button data-act="up" ${idx===0?'disabled':''} title="لأعلى">↑</button>
+        <button data-act="down" ${idx===investigationPath.nodeIds.length-1?'disabled':''} title="لأسفل">↓</button>
+        <button data-act="remove" title="إزالة">✕</button>
+      </span>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.path-node-row').forEach(row=>{
+    const id = Number(row.dataset.nodeId);
+    row.querySelector('.path-node-name').onclick = ()=>{
+      const n = nodes.find(x=>x.id===id);
+      if(n){ closeInvestigationModal(); openNode(n, true); }
+    };
+    row.querySelectorAll('button[data-act]').forEach(btn=>{
+      btn.onclick = async (e)=>{
+        e.stopPropagation();
+        const i = investigationPath.nodeIds.indexOf(id);
+        if(i === -1) return;
+        if(btn.dataset.act === 'remove'){
+          investigationPath.nodeIds.splice(i,1);
+        } else if(btn.dataset.act === 'up' && i>0){
+          [investigationPath.nodeIds[i-1], investigationPath.nodeIds[i]] = [investigationPath.nodeIds[i], investigationPath.nodeIds[i-1]];
+        } else if(btn.dataset.act === 'down' && i<investigationPath.nodeIds.length-1){
+          [investigationPath.nodeIds[i+1], investigationPath.nodeIds[i]] = [investigationPath.nodeIds[i], investigationPath.nodeIds[i+1]];
+        }
+        await saveInvestigationPathData();
+        renderPathNodesList();
+        refreshAddToPathBtn();
+      };
+    });
+  });
+}
+const savePathMetaBtnEl = document.getElementById('savePathMetaBtn');
+if(savePathMetaBtnEl){
+  savePathMetaBtnEl.onclick = async ()=>{
+    investigationPath.name = (document.getElementById('pathNameInput').value || '').trim();
+    investigationPath.question = (document.getElementById('pathQuestionInput').value || '').trim();
+    await saveInvestigationPathData();
+  };
+}
+
+// ---- item 4: جولة موجّهة (Guided Tour) على التسلسل اللاهوتي الرئيسي (1 → 15) ----
+function getTourSequence(){
+  return nodes
+    .map(n=>({ n, key: naturalNumberKey(n.name, n.category) }))
+    .filter(x=> x.key && x.key.length===1)
+    .sort((a,b)=> a.key[0]-b.key[0])
+    .map(x=>x.n);
+}
+let tourSeq = [], tourIndex = 0, tourActive = false;
+const tourBarEl = document.getElementById('tourBar');
+function updateTourStatusUi(){
+  const t = document.getElementById('tourStatusInline');
+  if(t && tourSeq.length) t.textContent = `${tourIndex+1} / ${tourSeq.length} — ${getDisplayName(tourSeq[tourIndex].name)}`;
+  const t2 = document.getElementById('tourStatus');
+  if(t2) t2.innerHTML = tourSeq.length
+    ? `<div class="analysis-result-block"><div class="analysis-result-title">الجولة نشطة</div>${nodeListRowHtml(tourSeq[tourIndex], `${tourIndex+1}/${tourSeq.length}`)}</div>`
+    : '<div class="analysis-empty">لا يوجد تسلسل مرقّم مكتشف حاليًا لبناء جولة عليه.</div>';
+}
+function startTour(){
+  tourSeq = getTourSequence();
+  if(!tourSeq.length){ updateTourStatusUi(); return; }
+  tourActive = true; tourIndex = 0;
+  if(tourBarEl) tourBarEl.style.display = 'flex';
+  closeInvestigationModal();
+  openNode(tourSeq[0], true);
+  updateTourStatusUi();
+}
+function tourStep(delta){
+  if(!tourActive || !tourSeq.length) return;
+  tourIndex = Math.min(tourSeq.length-1, Math.max(0, tourIndex+delta));
+  openNode(tourSeq[tourIndex], true);
+  updateTourStatusUi();
+}
+function endTour(){
+  tourActive = false;
+  if(tourBarEl) tourBarEl.style.display = 'none';
+}
+const startTourBtnEl = document.getElementById('startTourBtn');
+if(startTourBtnEl) startTourBtnEl.onclick = startTour;
+const tourPrevBtnEl = document.getElementById('tourPrevBtn');
+const tourNextBtnEl = document.getElementById('tourNextBtn');
+const tourExitBtnEl = document.getElementById('tourExitBtn');
+if(tourPrevBtnEl) tourPrevBtnEl.onclick = ()=> tourStep(-1);
+if(tourNextBtnEl) tourNextBtnEl.onclick = ()=> tourStep(1);
+if(tourExitBtnEl) tourExitBtnEl.onclick = endTour;
+
+// ---- investigation modal shell (نفس نمط analysis modal) ----
+const investigationOverlay = document.getElementById('investigationOverlay');
+const investigationBtnEl = document.getElementById('investigationBtn');
+const closeInvestigationBtn = document.getElementById('closeInvestigation');
+function openInvestigationModal(){
+  if(!investigationOverlay) return;
+  renderBookmarksList();
+  renderRecentList();
+  renderPathNodesList();
+  updateTourStatusUi();
+  investigationOverlay.classList.add('show');
+}
+function closeInvestigationModal(){
+  if(investigationOverlay) investigationOverlay.classList.remove('show');
+}
+if(investigationBtnEl) investigationBtnEl.onclick = openInvestigationModal;
+if(closeInvestigationBtn) closeInvestigationBtn.onclick = closeInvestigationModal;
+if(investigationOverlay) investigationOverlay.onclick = (e)=>{ if(e.target === investigationOverlay) closeInvestigationModal(); };
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape' && investigationOverlay && investigationOverlay.classList.contains('show')) closeInvestigationModal();
+});
+const investigationTabsEl = document.getElementById('investigationTabs');
+if(investigationTabsEl){
+  investigationTabsEl.querySelectorAll('.analysis-tab').forEach(btn=>{
+    btn.onclick = ()=>{
+      investigationTabsEl.querySelectorAll('.analysis-tab').forEach(b=> b.classList.toggle('active', b===btn));
+      investigationOverlay.querySelectorAll('.analysis-pane').forEach(p=> p.classList.remove('active'));
+      const pane = document.getElementById('pane' + btn.dataset.itab.charAt(0).toUpperCase() + btn.dataset.itab.slice(1));
+      if(pane) pane.classList.add('active');
+    };
+  });
+}
+
+// ============================================================
+// المرحلة 6 — العلاقات الدلالية (Typed/Weighted Edges) — بنية تحتية فقط
+// ============================================================
+// هام: طبقًا لقاعدة المرحلة صراحة، "ممنوع تصنيف كل الروابط دفعة واحدة" و"قيمة confidence لازم تُشتق
+// من تقييم فعلي... لو مفيش أساس واضح، سيب الحقل فاضي". النظام هنا مبني بالكامل وجاهز للاستخدام،
+// لكن data/edgeMeta.json بيتحمّل فاضي عمدًا — تصنيف حقيقي للعلاقات محتاج مراجعة تاريخية/معرفية
+// حقيقية لكل رابط (نوعه، قوته، مستوى الثقة فيه) مش تلقائي. أي رابط مالوش entry هنا يشتغل
+// بالسلوك الحالي بالظبط (خط رمادي عادي، بدون أي تمييز)، فصفر كسر وصفر تأثير بصري افتراضيًا.
+window.EDGE_META = window.EDGE_META || {};
+function edgeMetaKey(nameA, nameB){ return nameA + '|' + nameB; }
+function getEdgeMeta(nameA, nameB){
+  return window.EDGE_META[edgeMetaKey(nameA,nameB)] || window.EDGE_META[edgeMetaKey(nameB,nameA)] || null;
+}
+function edgeMetaFor(d){
+  const sName = d.source && d.source.name ? d.source.name : null;
+  const tName = d.target && d.target.name ? d.target.name : null;
+  if(!sName || !tName) return null;
+  return getEdgeMeta(sName, tName);
+}
+const EDGE_TYPE_COLORS = {
+  organizational: '#4f8fd1', historical: '#d9a441', thematic: '#5fa8a0',
+  evidence: '#3fae6a', opposing: '#e0674f', alias: '#8a6fd1'
+};
+const EDGE_TYPE_LABELS = {
+  organizational: 'تنظيمية', historical: 'تاريخية', thematic: 'موضوعية',
+  evidence: 'دليلية', opposing: 'متعارضة', alias: 'اسم بديل'
+};
+const EDGE_STRENGTH_WIDTH = { weak: 1, medium: 2, strong: 3.2 };
+const EDGE_STRENGTH_LABELS = { weak: 'ضعيفة', medium: 'متوسطة', strong: 'قوية' };
+
+const relInspectorEl = document.getElementById('relationshipInspector');
+function openRelationshipInspector(nodeAName, nodeBName, meta){
+  if(!relInspectorEl) return;
+  const typeLabel = EDGE_TYPE_LABELS[meta.type] || meta.type || 'غير محدد';
+  const strengthLabel = meta.strength ? (EDGE_STRENGTH_LABELS[meta.strength] || meta.strength) : null;
+  const confidenceText = (typeof meta.confidence === 'number') ? `${Math.round(meta.confidence*100)}%` : null;
+  const evidence = Array.isArray(meta.evidence) ? meta.evidence : [];
+  relInspectorEl.innerHTML = `
+    <button class="drawer-close" id="relInspectorClose">×</button>
+    <div class="ri-title">${escapeHtml(getDisplayName(nodeAName))} <span class="ri-arrow">↔</span> ${escapeHtml(getDisplayName(nodeBName))}</div>
+    <div class="ri-row"><span class="ri-label">النوع</span><span class="ri-val" style="color:${EDGE_TYPE_COLORS[meta.type]||'inherit'}">${escapeHtml(typeLabel)}</span></div>
+    ${strengthLabel ? `<div class="ri-row"><span class="ri-label">القوة</span><span class="ri-val">${escapeHtml(strengthLabel)}</span></div>` : ''}
+    ${confidenceText ? `<div class="ri-row"><span class="ri-label">مستوى الثقة</span><span class="ri-val">${confidenceText}</span></div>` : ''}
+    ${meta.explanation ? `<div class="ri-explain">${linkifyNodeMentions(meta.explanation)}</div>` : ''}
+    ${evidence.length ? `<div class="ri-evidence">${evidence.map(ev=>{
+      const url = typeof ev === 'string' ? ev : (ev.url || '');
+      const label = typeof ev === 'string' ? ev : (ev.label || ev.url || '');
+      return isSafeUrl(url) ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>` : '';
+    }).join('')}</div>` : ''}
+  `;
+  relInspectorEl.style.display = 'block';
+  const closeBtn = document.getElementById('relInspectorClose');
+  if(closeBtn) closeBtn.onclick = ()=> relInspectorEl.style.display = 'none';
+}
+
+// ============================================================
+// المرحلة 5 — تنقل متقدم
+// ============================================================
+
+// ---- item 1: Command Palette (Ctrl+K / Cmd+K) ----
+const cpOverlay = document.getElementById('commandPaletteOverlay');
+const cpInput = document.getElementById('commandPaletteInput');
+const cpResults = document.getElementById('commandPaletteResults');
+const commandPaletteBtnEl = document.getElementById('commandPaletteBtn');
+let cpActiveIndex = -1;
+let cpCurrentItems = [];
+
+function cpBuildItems(term){
+  term = term.trim().toLowerCase();
+  const items = [];
+  if(!term){
+    // بدون بحث: اعرض المفضلة أولًا كاختصار سريع، بعدين الفئات
+    [...bookmarkIds].slice(0,8).forEach(id=>{
+      const n = nodes.find(x=>x.id===id);
+      if(n) items.push({ type:'node', node:n, meta:'⭐ مفضلة' });
+    });
+    CATS.forEach(cat=> items.push({ type:'cat', cat }));
+    return items.slice(0,30);
+  }
+  if(term.startsWith('#') && term.length>1){
+    const tag = term.slice(1);
+    nodes.forEach(n=>{
+      const tags = noteTagIndex[n.id];
+      if(Array.isArray(tags) && tags.includes(tag)) items.push({ type:'node', node:n, meta:'#'+tag });
+    });
+    return items.slice(0,30);
+  }
+  CATS.forEach(cat=>{ if(cat.toLowerCase().includes(term)) items.push({ type:'cat', cat }); });
+  nodes.forEach(n=>{
+    if(n.name.toLowerCase().includes(term)) items.push({ type:'node', node:n, meta: n.category });
+  });
+  return items.slice(0,30);
+}
+function cpRender(){
+  cpCurrentItems = cpBuildItems(cpInput.value);
+  cpActiveIndex = cpCurrentItems.length ? 0 : -1;
+  cpDrawResults();
+}
+function cpDrawResults(){
+  if(!cpCurrentItems.length){
+    cpResults.innerHTML = '<div class="cp-empty">مفيش نتائج — جرّب كلمة تانية، أو ابدأ بـ # للبحث في الوسوم</div>';
+    return;
+  }
+  cpResults.innerHTML = cpCurrentItems.map((it, i)=>{
+    const active = i===cpActiveIndex ? ' cp-active' : '';
+    if(it.type==='cat'){
+      const count = nodes.filter(n=>n.category===it.cat).length;
+      return `<div class="cp-row${active}" data-idx="${i}"><span>🗂️ ${it.cat}</span><span class="cp-meta">${count} عقدة</span></div>`;
+    }
+    return `<div class="cp-row${active}" data-idx="${i}"><span>${getDisplayName(it.node.name)}</span><span class="cp-meta">${it.meta||''}</span></div>`;
+  }).join('');
+  cpResults.querySelectorAll('.cp-row').forEach(row=>{
+    row.onclick = ()=> cpActivate(Number(row.dataset.idx));
+  });
+}
+function cpActivate(idx){
+  const it = cpCurrentItems[idx];
+  if(!it) return;
+  if(it.type==='cat'){
+    activeCats = new Set([it.cat]);
+    renderCatList();
+    renderMainView();
+  } else {
+    openNode(it.node, true);
+  }
+  closeCommandPalette();
+}
+function openCommandPalette(){
+  if(!cpOverlay) return;
+  cpOverlay.classList.add('show');
+  cpInput.value = '';
+  cpRender();
+  setTimeout(()=> cpInput.focus(), 30);
+}
+function closeCommandPalette(){
+  if(cpOverlay) cpOverlay.classList.remove('show');
+}
+if(commandPaletteBtnEl) commandPaletteBtnEl.onclick = openCommandPalette;
+if(cpOverlay) cpOverlay.onclick = (e)=>{ if(e.target===cpOverlay) closeCommandPalette(); };
+if(cpInput) cpInput.addEventListener('input', cpRender);
+document.addEventListener('keydown', (e)=>{
+  const isMac = navigator.platform && navigator.platform.toLowerCase().includes('mac');
+  const mod = isMac ? e.metaKey : e.ctrlKey;
+  if(mod && (e.key==='k' || e.key==='K')){
+    e.preventDefault();
+    if(cpOverlay && cpOverlay.classList.contains('show')) closeCommandPalette();
+    else openCommandPalette();
+    return;
+  }
+  if(!cpOverlay || !cpOverlay.classList.contains('show')) return;
+  if(e.key==='Escape'){ closeCommandPalette(); return; }
+  if(e.key==='ArrowDown'){ e.preventDefault(); cpActiveIndex = Math.min(cpCurrentItems.length-1, cpActiveIndex+1); cpDrawResults(); return; }
+  if(e.key==='ArrowUp'){ e.preventDefault(); cpActiveIndex = Math.max(0, cpActiveIndex-1); cpDrawResults(); return; }
+  if(e.key==='Enter'){ e.preventDefault(); cpActivate(cpActiveIndex); return; }
+});
+
+// ---- item 3: تنقل لمسي محسّن على الموبايل — swipe بين العقد المرتبطة مباشرة ----
+let swipeStartX = null, swipeStartY = null;
+const swipeCursors = {};
+if(drawer){
+  drawer.addEventListener('touchstart', (e)=>{
+    if(!e.touches || e.touches.length!==1) return;
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+  }, { passive:true });
+  drawer.addEventListener('touchend', (e)=>{
+    if(swipeStartX===null || !currentNode) { swipeStartX=null; swipeStartY=null; return; }
+    const t = e.changedTouches && e.changedTouches[0];
+    const endX = t ? t.clientX : swipeStartX;
+    const endY = t ? t.clientY : swipeStartY;
+    const dx = endX - swipeStartX, dy = endY - swipeStartY;
+    swipeStartX = null; swipeStartY = null;
+    if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy)*1.5) return; // مش سحب أفقي واضح — تجاهل
+    const resolvable = currentNode.connections.map(c=>findByName(c)).filter(Boolean);
+    if(!resolvable.length) return;
+    const sourceId = currentNode.id;
+    const dir = dx < 0 ? 1 : -1;
+    let idx = swipeCursors[sourceId] !== undefined ? swipeCursors[sourceId] : -1;
+    idx = ((idx + dir) % resolvable.length + resolvable.length) % resolvable.length;
+    swipeCursors[sourceId] = idx;
+    openNode(resolvable[idx], true);
+  }, { passive:true });
+}
+
 // ---- Stage 1 / item 1: boot screen ----
 const bootScreen = document.getElementById('bootScreen');
 const bootStartBtn = document.getElementById('bootStartBtn');
@@ -1634,6 +2377,9 @@ const bootStartBtn = document.getElementById('bootStartBtn');
 // ---- init ----
 async function init(){
   await loadOverlayMeta();
+  await loadEdgeMetaOverrides();
+  await loadBookmarksAndRecent();
+  await loadInvestigationPath();
   const catIndex = Object.fromEntries(CATS_ALL.map((c,i)=>[c,i]));
   nodes.sort((a,b)=>{
     const ca = catIndex[a.category] ?? 999, cb = catIndex[b.category] ?? 999;
@@ -1659,7 +2405,11 @@ async function init(){
     return count;
   })();
 
-  if(bootScreen && bootStartBtn){
+  // ---- Stage 4 / item 2: لو في ?node= في الرابط، افتحه مباشرة وتخطَّ شاشة البداية ----
+  const deepLinkOpened = (typeof tryOpenNodeFromUrl === 'function') ? tryOpenNodeFromUrl() : false;
+  if(deepLinkOpened){
+    switchToView('grid');
+  } else if(bootScreen && bootStartBtn){
     document.getElementById('bootNodeCount').textContent = nodes.length;
     document.getElementById('bootLinkCount').textContent = totalLinks;
     bootScreen.classList.add('show');
