@@ -98,17 +98,76 @@ async function saveEdgeMetaOverride(key, meta){
 // والعملي: التطبيق بيجهّز "طلب بحث" كامل السياق (اسم العقدة، فئتها، روابطها الحالية، وفهرس بكل
 // أسماء العقد التانية عشان الموديل يقدر يكتشف روابط حقيقية بينها)، المستخدم يلزقه في محادثة Claude
 // عادية فيها بحث الويب، وبعدين يلزق الرد هنا — والتطبيق بيتحقق ويعاين قبل ما يطبّق أي تغيير فعلي.
+// أرقام العقد اللي بتمثل السلسلة اللاهوتية الخطية (من "1 وجود الله" لحد "12.1 أمر الله بالسجود")
+// دي سلسلة سردية واحدة بلا تشعب حقيقي، فمحتاجة برومبت مختلف تمامًا عن باقي الشبكة (13 فما فوق).
+const THEOLOGICAL_CHAIN_IDS = new Set([1170,1171,1172,1173,1174,1175,1176,1177,1178,1179, 33,14,15,16,17]);
+
+function isTheologicalChainNode(node){
+  return THEOLOGICAL_CHAIN_IDS.has(node.id);
+}
+
 function buildResearchPrompt(node){
   const existingConn = (node.connections||[]).join('، ') || 'لا يوجد';
   const existingSources = Array.isArray(node.sources) && node.sources.length
     ? node.sources.map(s=> `- ${s.label} — ${s.url}`).join('\n')
     : '(لا يوجد)';
   const existingSummary = node.hubSummary ? node.hubSummary : '(لا يوجد)';
+
+  return isTheologicalChainNode(node)
+    ? buildTheologicalChainPrompt(node, existingConn, existingSources, existingSummary)
+    : buildFullEncyclopedicPrompt(node, existingConn, existingSources, existingSummary);
+}
+
+// ---- الصيغة B: السلسلة اللاهوتية الخطية (عقد 1 لحد 12.1) ----
+function buildTheologicalChainPrompt(node, existingConn, existingSources, existingSummary){
+  // فهرس مصغّر: بس عقد السلسلة نفسها + أي عقدة عندها ربط ديني موثق فعلاً (parentHub) —
+  // مش الفهرس الكامل لأكتر من 1200 عقدة، عشان مفيش مجال للربط العشوائي بموضوعات حديثة بعيدة.
+  const chainNames = nodes
+    .filter(n=> THEOLOGICAL_CHAIN_IDS.has(n.id))
+    .map(n=> `${n.name} [#${n.id}]`)
+    .join(' | ');
+
+  return `أنت باحث متخصص في التفسير وعلوم القرآن والسيرة النبوية. مطلوب منك بحث حقيقي وموثّق (تفاسير معتمدة، أحاديث، مصادر أكاديمية إسلامية)، بدون اختراع أي معلومة أو مصدر.
+
+## العقدة المطلوب البحث عنها
+الاسم: ${node.name}
+الفئة: ${node.category}
+السياق: هذه العقدة جزء من تسلسل سردي خطّي واحد (قصة الخلق من وجود الله وحده إلى إسكان آدم الجنة)، وليست جزءًا من شبكة العلاقات المتشعبة الكبيرة في باقي قاعدة المعرفة.
+الروابط الحالية المسجّلة يدويًا: ${existingConn}
+الملخص الحالي (لو موجود): ${existingSummary}
+المصادر الحالية (لو موجودة):
+${existingSources}
+
+## المطلوب بالظبط
+1. ابحث فعليًا (تفسير الطبري، ابن كثير، القرطبي، أو مصادر علمية معتمدة عن قصص الأنبياء) — لو مش قادر تبحث، قول كده صراحة ومتكملش.
+2. اكتب ملخصًا (hubSummary) بالعربية، 150-300 كلمة، يعرض الأقوال المختلفة للمفسرين لو فيه خلاف بينهم، بدون ترجيح شخصي.
+3. اذكر 2-5 مصادر حقيقية (كتب تفسير أو مواقع علمية موثوقة)، وممنوع اختراع أي رابط أو عنوان.
+4. الروابط المقترحة (suggestedConnections) هنا استثنائية جدًا: اقترح ربط فقط لو فيه نص تفسيري أو حديثي صريح يربط هذه العقدة بعقدة تانية من نفس السلسلة (المذكورة تحت)، أو بشخصية دينية موثقة تاريخيًا خارج السلسلة (مثال: نسب بعض المفسرين شخصية "تحوت" المصرية القديمة إلى "إدريس عليه السلام"). لو مفيش نص صريح، سيب suggestedConnections فاضية تمامًا — ممنوع الربط بمجرد التشابه الموضوعي أو اللغوي.
+5. لكل رابط مقترح (لو وُجد) اكتب: الاسم بالظبط مع رقم الـ#، وجملة تعليل كاملة تذكر المصدر التفسيري، ونوعه (اختر واحد: religious, historical, alias)، وقوته (strong لو نص صريح متفق عليه، medium لو خلافي بين المفسرين).
+
+## عقد السلسلة اللاهوتية (للسياق فقط، مش للبحث عنها)
+${chainNames}
+
+## صيغة الرد المطلوبة (JSON فقط، بدون أي نص تاني قبله أو بعده)
+{
+  "hubSummary": "نص الملخص هنا أو فاضي",
+  "sources": [{"label": "اسم المصدر", "url": "https://..."}],
+  "suggestedConnections": [
+    {"targetName": "الاسم بالظبط مع رقم الـ#", "reason": "جملة تعليل كاملة تذكر المصدر التفسيري", "type": "religious", "strength": "strong"}
+  ]
+}`;
+}
+
+// ---- الصيغة A: الشبكة الموسوعية الكاملة (عقد 13.0 فما فوق) ----
+function buildFullEncyclopedicPrompt(node, existingConn, existingSources, existingSummary){
   const byCat = {};
-  nodes.forEach(n=>{ (byCat[n.category] = byCat[n.category]||[]).push(`${n.name} [#${n.id}]`); });
+  nodes.forEach(n=>{
+    if(THEOLOGICAL_CHAIN_IDS.has(n.id)) return; // السلسلة اللاهوتية مستبعدة من فهرس الربط هنا
+    (byCat[n.category] = byCat[n.category]||[]).push(`${n.name} [#${n.id}]`);
+  });
   const indexText = Object.keys(byCat).sort().map(cat=> `### ${cat}\n${byCat[cat].join(' | ')}`).join('\n\n');
 
-  return `أنت باحث توثيقي دقيق. مطلوب منك بحث حقيقي على الويب عن الموضوع التالي، بدون اختراع أي معلومة أو مصدر.
+  return `أنت باحث تاريخي واستقصائي متخصص في بناء قواعد المعرفة (Knowledge Graph)، ملتزم بالحياد العلمي والتمييز بين الحقائق والادعاءات والفرضيات ونظريات المؤامرة. مطلوب منك بحث حقيقي على الويب، بدون اختراع أي معلومة أو مصدر.
 
 ## العقدة المطلوب البحث عنها
 الاسم: ${node.name}
@@ -119,13 +178,20 @@ function buildResearchPrompt(node){
 ${existingSources}
 
 ## المطلوب بالظبط
-1. ابحث فعليًا على الويب عن هذا الموضوع (لو مش قادر تبحث، قول كده صراحة ومتكملش).
-2. اكتب ملخصًا (hubSummary) بالعربية، 150-300 كلمة، دقيق ومحايد. لو الموضوع نظرية أو ادّعاء غير مثبت علميًا/تاريخيًا، وضّح ده صراحة في الملخص نفسه بدل ما تقدّمه كحقيقة مؤكدة.
-3. اذكر 2-6 مصادر حقيقية فقط (روابط قابلة للتحقق فعلًا من نتائج بحثك). ممنوع اختراع أي رابط أو عنوان.
-4. من "فهرس العقد الموجودة بالفعل" تحت، حدد فقط الأسماء اللي لقيت رابطًا حقيقيًا وموثّقًا بينها وبين "${node.name}" استنادًا لنتائج بحثك — مش بمجرد تشابه الاسم أو التخمين. لكل رابط مقترح اكتب: الاسم بالظبط زي ما هو مكتوب في الفهرس (بما فيه رقم الـ #)، وسبب الربط باختصار، ونوعه (اختر واحد: organizational, historical, thematic, evidence, opposing, alias)، وقوته (weak, medium, strong).
-5. لو مفيش معلومات موثوقة كافية عن الموضوع، رجّع hubSummary وsources فاضيين ووضّح السبب، وماتخترعش حاجة.
+1. ابحث فعليًا على الويب (لو مش قادر تبحث، قول كده صراحة ومتكملش).
+2. اكتب ملخصًا (hubSummary) بالعربية، 150-300 كلمة، محايد تمامًا. صنّف طبيعة المعلومة صراحة داخل الملخص نفسه (حقيقة تاريخية موثقة / حقيقة علمية / ادعاء / فرضية / رواية شفهية / نظرية مؤامرة / تفسير أكاديمي / تفسير بديل) — لا تقدّم أي ادعاء أو نظرية كحقيقة مؤكدة.
+3. اذكر 2-6 مصادر حقيقية فقط (روابط قابلة للتحقق فعليًا من نتائج بحثك). ممنوع اختراع أي رابط أو عنوان.
+4. من "فهرس العقد الموجودة بالفعل" تحت، حدد فقط الأسماء اللي لقيت رابطًا حقيقيًا وموثّقًا بينها وبين "${node.name}" استنادًا لنتائج بحثك الفعلية — مش بمجرد تشابه الاسم، أو تشابه الموضوع العام (زي "سيطرة" أو "نخبة")، أو التخمين. لو مش متأكد من وجود رابط موثّق، لا تقترحه إطلاقًا وسيبه برا القائمة.
+5. لكل رابط مقترح اكتب بالتفصيل:
+   - targetName: الاسم بالظبط زي ما هو مكتوب في الفهرس (بما فيه رقم الـ#)
+   - reason: جملة تعليل كاملة (مش مجرد "مرتبط بـ") توضح مين قال إيه ولية، ومصدر هذا الربط تحديدًا
+   - type: اختر الأدق من: alias, historical, thematic, evidence, organizational, opposing, claimed, speculative, conspiracy, popularized, debunked, disputed, indirect, influence, scientific, ideological, intelligence, financial, military, religious, cultural, symbolic
+   - strength: very_strong, strong, medium, weak, very_weak, unknown
+   - evidenceLevel: documented_fact, scientific_fact, claim, hypothesis, oral_account, conspiracy_theory, personal_opinion, academic_interpretation, alternative_interpretation
+   - sourceCategory: اذكر نوع المصدر (مثال: "كتاب أكاديمي"، "أدبيات مؤامرة"، "وثيقة حكومية مفرج عنها"، "فيلم وثائقي")
+6. لو مفيش معلومات موثوقة كافية عن الموضوع، رجّع hubSummary وsources فاضيين ووضّح السبب، وماتخترعش حاجة.
 
-## فهرس العقد الموجودة بالفعل (للربط بينها وبين الموضوع فقط، مش للبحث عنها)
+## فهرس العقد الموجودة بالفعل (للربط بينها وبين الموضوع فقط، مش للبحث عنها — السلسلة اللاهوتية 1-12.1 مستبعدة من هذا الفهرس لأنها سلسلة منفصلة)
 ${indexText}
 
 ## صيغة الرد المطلوبة (JSON فقط، بدون أي نص تاني قبله أو بعده)
@@ -133,7 +199,14 @@ ${indexText}
   "hubSummary": "نص الملخص هنا أو فاضي",
   "sources": [{"label": "اسم المصدر", "url": "https://..."}],
   "suggestedConnections": [
-    {"targetName": "الاسم بالظبط من الفهرس مع رقم الـ#", "reason": "سبب الربط المكتشف من البحث", "type": "thematic", "strength": "medium"}
+    {
+      "targetName": "الاسم بالظبط من الفهرس مع رقم الـ#",
+      "reason": "جملة تعليل كاملة تذكر مصدر الربط ومين يقول بيه",
+      "type": "thematic",
+      "strength": "medium",
+      "evidenceLevel": "claim",
+      "sourceCategory": "نوع المصدر هنا"
+    }
   ]
 }`;
 }
@@ -217,7 +290,7 @@ if(previewResearchBtn){
         const label = m.target ? getDisplayName(m.target.name) : `${m.targetName} (⚠️ لم يتم إيجاد عقدة مطابقة بهذا الاسم بالضبط)`;
         return `<label class="rp-conn-row${unmatchedCls}">
           <input type="checkbox" class="rp-conn-check" data-idx="${i}" ${m.target ? 'checked':'disabled'}>
-          <span>${escapeHtml(label)}<br><span class="rp-conn-reason">${escapeHtml(m.reason||'')} — ${escapeHtml(m.type||'')}/${escapeHtml(m.strength||'')}</span></span>
+          <span>${escapeHtml(label)}<br><span class="rp-conn-reason">${escapeHtml(m.reason||'')} — ${escapeHtml(m.type||'')}/${escapeHtml(m.strength||'')}${m.evidenceLevel ? ' — ' + escapeHtml(m.evidenceLevel) : ''}${m.sourceCategory ? ' (' + escapeHtml(m.sourceCategory) + ')' : ''}</span></span>
         </label>`;
       }).join('');
     }
