@@ -259,6 +259,8 @@ function openNode(node, pushHistory, opts){
   if(typeof refreshAddToPathBtn === 'function') refreshAddToPathBtn();
   overlay.style.display = 'block';
   drawer.classList.add('open');
+  // ---- لو إحنا واقفين في وضع الشبكة، زوّم واتمركز على العقدة دي بدل ما يفضل الجراف زي ما هو ----
+  if(typeof focusNodeInGraph === 'function') focusNodeInGraph(node.id);
 }
 
 function closeDrawer(){
@@ -438,4 +440,109 @@ document.getElementById('backBtn').onclick = ()=>{
 document.getElementById('fwdBtn').onclick = ()=>{
   if(historyPos < history.length-1){ historyPos++; openNode(nodes.find(n=>n.id===history[historyPos]), false); }
 };
+
+// ============================================================
+// صفحة "عرض المقال الكامل" — عرض كل المعلومات المستنتجة عن العقدة
+// (الملخص، المصادر، كل الروابط بتصنيفها وأسبابها لو موجودة) كصفحة واحدة كاملة شبه ويكي،
+// بدل ما المستخدم يقرا كل حاجة مبعثرة في الـ drawer الجانبي الصغير.
+// ============================================================
+const articleViewOverlay = document.getElementById('articleViewOverlay');
+const articleViewBody = document.getElementById('articleViewBody');
+const articleViewExit = document.getElementById('articleViewExit');
+const openArticleViewBtn = document.getElementById('openArticleViewBtn');
+
+function relationTypeLabel(type){
+  const labels = {
+    alias:'اسم بديل', historical:'تاريخية', thematic:'موضوعية', evidence:'دليل مباشر', organizational:'تنظيمية', opposing:'معارضة',
+    claimed:'مزعومة', speculative:'تخمينية', conspiracy:'أدبيات مؤامرة', popularized:'شائعة ثقافيًا', debunked:'مفنّدة',
+    disputed:'محل خلاف', indirect:'غير مباشرة', influence:'تأثير', scientific:'علمية', ideological:'فكرية',
+    intelligence:'استخباراتية', financial:'مالية', military:'عسكرية', religious:'دينية', cultural:'ثقافية', symbolic:'رمزية'
+  };
+  return labels[type] || type;
+}
+function strengthLabel(s){
+  const labels = { very_strong:'قوية جدًا', strong:'قوية', medium:'متوسطة', weak:'ضعيفة', very_weak:'ضعيفة جدًا', unknown:'غير محددة' };
+  return labels[s] || s;
+}
+
+function openArticleView(node){
+  if(!node || !articleViewOverlay) return;
+
+  const catColor = CAT_COLORS[node.category] || '#8b909c';
+  const badges = (node.epistemicStatus ? epistemicBadgeHtml(node.epistemicStatus) : '');
+
+  // Infobox
+  const infoRows = [
+    ['الفئة', escapeHtml(node.category)],
+    ['عدد الاتصالات المعلنة', String(node.connections.length)],
+    ['المصادر الموثقة', String(Array.isArray(node.sources) ? node.sources.length : 0)],
+  ];
+  if(node.parentHub) infoRows.push(['جزء من', escapeHtml(getDisplayName(node.parentHub))]);
+  if(node.added) infoRows.push(['ملاحظة', 'عقدة مُضافة يدويًا']);
+  const infoboxHtml = `<div class="av-infobox"><h4>معلومات سريعة</h4>` +
+    infoRows.map(([k,v])=>`<div class="av-row"><span>${k}</span><strong>${v}</strong></div>`).join('') +
+    `</div>`;
+
+  // الملخص
+  const summaryHtml = node.hubSummary
+    ? `<div class="av-summary">${escapeHtml(node.hubSummary).replace(/\n/g,'<br>')}</div>`
+    : `<div class="av-empty">لا يوجد ملخص بحث مسجّل لهذه العقدة بعد — استخدم زرار "🔍 جهّز طلب بحث" لتوليده.</div>`;
+
+  // المصادر
+  const sourcesList = Array.isArray(node.sources) ? node.sources : [];
+  const sourcesHtml = sourcesList.length
+    ? '<ol>' + sourcesList.map(s=>{
+        const safeUrl = isSafeUrl(s.url) ? s.url : '#';
+        return `<li class="av-source-item"><a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.label || s.url)}</a></li>`;
+      }).join('') + '</ol>'
+    : `<div class="av-empty">لا يوجد مصادر مسجّلة بعد.</div>`;
+
+  // العلاقات — كل عقدة موصولة، مع تصنيفها وسببها لو موجود في EDGE_META
+  const relHtml = node.connections.length
+    ? node.connections.map(cname=>{
+        const target = findByName(cname);
+        const meta = (typeof getEdgeMeta === 'function') ? getEdgeMeta(node.name, cname) : null;
+        const metaLine = meta
+          ? `<div class="av-rel-meta"><span class="av-badge">${relationTypeLabel(meta.type)}</span><span class="av-badge">${strengthLabel(meta.strength)}</span>${meta.evidenceLevel ? `<span class="av-badge">${escapeHtml(meta.evidenceLevel)}</span>` : ''}</div>`
+          : `<div class="av-rel-meta"><span class="av-badge">تصنيف غير مسجّل بعد</span></div>`;
+        const reasonLine = meta && meta.reason ? `<div class="av-rel-reason">${escapeHtml(meta.reason)}</div>` : '';
+        const div = document.createElement('div');
+        div.className = 'av-rel-item';
+        div.innerHTML = `<div class="av-rel-name">${escapeHtml(getDisplayName(cname))}</div>${metaLine}${reasonLine}`;
+        if(target){
+          div.setAttribute('role','button'); div.setAttribute('tabindex','0');
+          div.onclick = ()=>{ closeArticleView(); openNode(target, true); };
+          div.onkeydown = (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); div.onclick(); } };
+        }
+        return div.outerHTML;
+      }).join('')
+    : `<div class="av-empty">لا توجد اتصالات معلنة بعد.</div>`;
+
+  // المقال/التحليل الشخصي (Markdown notes) لو موجود — يتحمّل من نفس تخزين الملاحظات
+  let notesHtml = `<div class="av-empty">لسه مفيش مقال شخصي مكتوب لهذه العقدة.</div>`;
+  if(currentNode && currentNode.id === node.id && notesEl && notesEl.value && notesEl.value.trim()){
+    notesHtml = `<div class="av-summary">${window.marked ? window.marked.parse(notesEl.value) : escapeHtml(notesEl.value)}</div>`;
+  }
+
+  articleViewBody.innerHTML = `
+    <div class="av-cat" style="color:${catColor}">${escapeHtml(node.category)} ${badges}</div>
+    <div class="av-title">${escapeHtml(getDisplayName(node.name))}</div>
+    ${infoboxHtml}
+    <div class="av-section"><h3>الملخص</h3>${summaryHtml}</div>
+    <div class="av-section"><h3>المصادر</h3>${sourcesHtml}</div>
+    <div class="av-section"><h3>العلاقات (${node.connections.length})</h3>${relHtml}</div>
+    <div class="av-section av-notes"><h3>المقال الشخصي / التحليل</h3>${notesHtml}</div>
+  `;
+
+  articleViewOverlay.classList.add('show');
+}
+function closeArticleView(){
+  if(articleViewOverlay) articleViewOverlay.classList.remove('show');
+}
+if(openArticleViewBtn) openArticleViewBtn.onclick = ()=> currentNode && openArticleView(currentNode);
+if(articleViewExit) articleViewExit.onclick = closeArticleView;
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape' && articleViewOverlay && articleViewOverlay.classList.contains('show')) closeArticleView();
+});
+
 

@@ -102,6 +102,51 @@ function computeGraphDataset(){
   return { graphNodes, keptLinks, primaryIds, primaryCount: primaryNodes.length, bridgeCount: bridgeNodes.length, totalMatched, trimmedByImportance };
 }
 
+// ---- حالة آخر رسم للجراف (لازمة عشان ميزة "التركيز على عقدة" تقدر توصل للجراف من بره renderForceGraph) ----
+let lastGraphPositions = new Map(); // nodeId -> {x,y}
+let lastGraphSvg = null;
+let lastGraphZoomBehavior = null;
+let lastGraphGnodeSel = null;
+let lastGraphWidth = 0, lastGraphHeight = 0;
+
+// يزوم ويتمركز على عقدة معيّنة داخل وضع الشبكة (بيتنادى من openNode لما نكون في وضع الشبكة أصلاً).
+// لو العقدة مش ظاهرة حاليًا (فئتها مش مفعّلة أو فلترها البحث)، بيوسّع الفلتر الأدنى الكافي عشان تظهر.
+function focusNodeInGraph(nodeId){
+  if(typeof currentView === 'undefined' || currentView !== 'graph') return;
+  const target = nodes.find(n=>n.id===nodeId);
+  if(!target) return;
+
+  let needsRerender = false;
+  if(!activeCats.has(target.category)){ activeCats.add(target.category); needsRerender = true; }
+  if(searchTerm && searchTerm.trim() && !matchesSearchTerm(target, searchTerm.trim().toLowerCase())){
+    searchTerm = '';
+    const searchInputEl = document.getElementById('search');
+    if(searchInputEl) searchInputEl.value = '';
+    needsRerender = true;
+  }
+  if(needsRerender){ renderCatList(); showGraphView(); }
+
+  const doFocus = ()=>{
+    const pos = lastGraphPositions.get(nodeId);
+    if(!pos || !lastGraphSvg || !lastGraphZoomBehavior) return;
+    const currentK = d3.zoomTransform(lastGraphSvg.node()).k;
+    const k = Math.min(2.2, Math.max(currentK, 1.4));
+    const newTransform = d3.zoomIdentity
+      .translate(lastGraphWidth/2 - k*pos.x, lastGraphHeight/2 - k*pos.y)
+      .scale(k);
+    lastGraphSvg.transition().duration(500).call(lastGraphZoomBehavior.transform, newTransform);
+    if(lastGraphGnodeSel){
+      lastGraphGnodeSel.classed('gnode-focus-pulse', false); // reset لو كانت شغالة من قبل
+      const sel = lastGraphGnodeSel.filter(d=>d.id===nodeId);
+      sel.classed('gnode-focus-pulse', true);
+      setTimeout(()=> sel.classed('gnode-focus-pulse', false), 2000);
+    }
+  };
+  // لو عملنا rerender، استنى فريم كمان عشان الـ simulation والـ DOM يخلصوا قبل ما نزوم
+  if(needsRerender) requestAnimationFrame(()=> requestAnimationFrame(doFocus));
+  else doFocus();
+}
+
 let resizeGraphTimer = null;
 function showGraphView(){
   const { graphNodes, keptLinks, primaryIds, primaryCount, bridgeCount, totalMatched, trimmedByImportance } = computeGraphDataset();
@@ -143,6 +188,10 @@ function renderForceGraph(gNodes, gLinks, primaryIds){
     onZoomExtra(event.transform);
   });
   svg.call(zoomBehavior);
+  lastGraphSvg = svg;
+  lastGraphZoomBehavior = zoomBehavior;
+  lastGraphWidth = width;
+  lastGraphHeight = height;
 
   const nodesCopy = gNodes.map(n=>({...n, isBridge: !primaryIds.has(n.id)}));
   const linksCopy = gLinks.map(l=>({...l}));
@@ -163,6 +212,8 @@ function renderForceGraph(gNodes, gLinks, primaryIds){
 
   const ticks = Math.min(500, Math.max(150, nodesCopy.length * 1.5));
   for(let i=0;i<ticks;i++) sim.tick();
+
+  lastGraphPositions = new Map(nodesCopy.map(d=>[d.id, {x:d.x, y:d.y}]));
 
   const link = zoomLayer.append('g').selectAll('line')
     .data(linksCopy).join('line')
@@ -185,6 +236,7 @@ function renderForceGraph(gNodes, gLinks, primaryIds){
       .on('start', (event,d)=>{ if(!event.active) sim.alphaTarget(0.25).restart(); d.fx=d.x; d.fy=d.y; })
       .on('drag', (event,d)=>{ d.fx=event.x; d.fy=event.y; })
       .on('end', (event,d)=>{ if(!event.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+  lastGraphGnodeSel = gnode;
 
   gnode.append('circle')
     .attr('r', d=> (d.isBridge ? 4 : 6) + Math.min(d.connections.length, 20)*(d.isBridge?0.5:0.9))

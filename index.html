@@ -515,6 +515,12 @@
 
   /* --- Spotlight/focus dimming on hover (item 2) --- */
   .gnode.dimmed{ opacity:0.15; }
+  @keyframes gnodeFocusPulse{
+    0%{ stroke-width:2px; stroke-opacity:1; }
+    50%{ stroke-width:5px; stroke-opacity:0.5; }
+    100%{ stroke-width:2px; stroke-opacity:1; }
+  }
+  .gnode-focus-pulse circle{ stroke:var(--accent-2) !important; animation:gnodeFocusPulse 0.9s ease-in-out 2; }
   .glink.dimmed{ opacity:0.06 !important; }
 
   /* --- Smoother Grid <-> Graph transition (item 5) --- */
@@ -537,6 +543,42 @@
     padding:var(--space-4) var(--space-8); border-radius:var(--radius-md); cursor:pointer;
   }
   #drawer.reading-mode #readingModeExit{ display:block; }
+
+  /* --- صفحة المقال الكامل (item: full wiki-style article page) --- */
+  #articleViewOverlay{
+    display:none; position:fixed; inset:0; z-index:calc(var(--z-modal) + 2);
+    background:var(--bg); overflow-y:auto;
+  }
+  #articleViewOverlay.show{ display:block; }
+  #articleViewPage{ max-width:920px; margin:0 auto; padding:var(--space-14) var(--space-8) 80px; }
+  #articleViewExit{
+    position:fixed; top:16px; left:16px; z-index:1; background:var(--accent-2); color:var(--text-on-accent);
+    border:none; font-weight:700; padding:var(--space-4) var(--space-8); border-radius:var(--radius-md); cursor:pointer;
+  }
+  .av-title{ font-size:32px; font-weight:800; margin:var(--space-8) 0 var(--space-3); color:var(--text); }
+  .av-cat{ font-size:var(--fs-sm-alt); font-weight:700; margin-bottom:var(--space-6); }
+  .av-infobox{
+    float:left; width:260px; margin:0 0 var(--space-6) var(--space-8); border:1px solid var(--line);
+    border-radius:var(--radius-md); background:var(--panel); padding:var(--space-6); font-size:var(--fs-sm-alt);
+  }
+  .av-infobox h4{ margin:0 0 var(--space-4); font-size:var(--fs-md); color:var(--accent-2); border-bottom:1px solid var(--line); padding-bottom:var(--space-3); }
+  .av-infobox .av-row{ display:flex; justify-content:space-between; gap:var(--space-4); padding:var(--space-2) 0; border-bottom:1px dashed var(--line); }
+  .av-infobox .av-row:last-child{ border-bottom:none; }
+  .av-section h3{ color:var(--accent-2); margin:var(--space-10) 0 var(--space-4); font-size:20px; border-bottom:1px solid var(--line); padding-bottom:var(--space-2); }
+  .av-summary{ font-size:16px; line-height:1.9; color:var(--text); }
+  .av-empty{ color:var(--muted); font-style:italic; font-size:var(--fs-sm-alt); }
+  .av-source-item{ padding:var(--space-2) 0; }
+  .av-rel-item{
+    border:1px solid var(--line); border-radius:var(--radius-sm); padding:var(--space-4) var(--space-5);
+    margin-bottom:var(--space-3); cursor:pointer; transition:border-color var(--transition-fast);
+  }
+  .av-rel-item:hover{ border-color:var(--accent-2); }
+  .av-rel-item .av-rel-name{ font-weight:700; }
+  .av-rel-item .av-rel-meta{ font-size:var(--fs-xs); color:var(--muted); margin-top:var(--space-2); }
+  .av-rel-item .av-rel-reason{ font-size:var(--fs-sm-alt); margin-top:var(--space-2); color:var(--text); }
+  .av-badge{ display:inline-block; font-size:var(--fs-xs); padding:2px 8px; border-radius:999px; border:1px solid var(--line); margin-inline-end:6px; }
+  #articleViewBody{ clear:both; }
+  #articleViewBody .av-notes{ clear:both; }
 
   /* ============ المرحلة 4: التحقيق والمسارات ============ */
   #investigationOverlay.show{ display:flex; }
@@ -737,6 +779,7 @@
     <div class="drawer-name" id="dName"></div>
     <button id="addToPathBtn" title="أضف هذه العقدة لمسار التحقيق النشط">➕ أضف لمسار التحقيق</button>
     <button id="researchNodeBtn" title="جهّز طلب بحث خارجي لهذه العقدة">🔍 جهّز طلب بحث</button>
+    <button id="openArticleViewBtn" title="اعرض كل المعلومات المستنتجة لهذه العقدة كصفحة كاملة">📄 عرض المقال الكامل</button>
     <div id="moveRow" style="display:none; margin-top:10px;">
       <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:4px;">نقل لفئة تانية:</label>
       <select id="moveCatSelect"></select>
@@ -773,6 +816,13 @@
     <div class="tag-chips" id="noteTagsRow"></div>
   </div>
   <div class="breadcrumbs" id="breadcrumbs"></div>
+</div>
+
+<div id="articleViewOverlay">
+  <div id="articleViewPage">
+    <button id="articleViewExit" title="خروج">✕ خروج من صفحة المقال</button>
+    <div id="articleViewBody"></div>
+  </div>
 </div>
 
 <div id="newNodeOverlay">
