@@ -213,21 +213,32 @@ ${indexText}
 
 const researchOverlay = document.getElementById('researchOverlay');
 const researchNodeBtnEl = document.getElementById('researchNodeBtn');
+const fullArticleBtnEl = document.getElementById('fullArticleBtn');
 const researchPromptOut = document.getElementById('researchPromptOut');
 const researchImportIn = document.getElementById('researchImportIn');
 const researchPreviewEl = document.getElementById('researchPreview');
+const researchModalTitle = document.getElementById('researchModalTitle');
+const researchModalHint = document.getElementById('researchModalHint');
+const researchJsonImportSection = document.getElementById('researchJsonImportSection');
+const fullArticleHint = document.getElementById('fullArticleHint');
 let lastResearchParsed = null;
 
-function openResearchModal(){
+function openResearchModal(mode){
   if(!researchOverlay || !currentNode) return;
-  researchPromptOut.value = buildResearchPrompt(currentNode);
+  const isArticleMode = mode === 'article';
+  researchPromptOut.value = isArticleMode ? buildFullArticlePrompt(currentNode) : buildResearchPrompt(currentNode);
   researchImportIn.value = '';
   researchPreviewEl.innerHTML = '';
   lastResearchParsed = null;
+  if(researchModalTitle) researchModalTitle.textContent = isArticleMode ? '📚 طلب مقال بحثي كامل (~5000 كلمة)' : '🔍 بحث خارجي لهذه العقدة';
+  if(researchModalHint) researchModalHint.style.display = isArticleMode ? 'none' : '';
+  if(researchJsonImportSection) researchJsonImportSection.style.display = isArticleMode ? 'none' : '';
+  if(fullArticleHint) fullArticleHint.style.display = isArticleMode ? '' : 'none';
   UI.Modal.open('researchOverlay');
 }
 function closeResearchModal(){ if(researchOverlay) UI.Modal.close('researchOverlay'); }
-if(researchNodeBtnEl) researchNodeBtnEl.onclick = openResearchModal;
+if(researchNodeBtnEl) researchNodeBtnEl.onclick = ()=> openResearchModal('quick');
+if(fullArticleBtnEl) fullArticleBtnEl.onclick = ()=> openResearchModal('article');
 const closeResearchBtn = document.getElementById('closeResearch');
 if(closeResearchBtn) closeResearchBtn.onclick = closeResearchModal;
 if(researchOverlay) researchOverlay.onclick = (e)=>{ if(e.target===researchOverlay) closeResearchModal(); };
@@ -457,5 +468,94 @@ async function tryCompleteLink(targetNode){
   linkSourceId = null;
   linkModeBanner.style.display = 'none';
   return true;
+}
+
+// ============================================================
+// برومبت "المقال الكامل" (~5000 كلمة) — مخرجاته Markdown خام تتلصق يدويًا في
+// تبويب "تعديل" > الملاحظات، مش JSON. منفصل تمامًا عن buildResearchPrompt
+// (اللي هدفه بس ملخص قصير + مصادر + روابط مهيكلة للشبكة).
+// ============================================================
+function buildFullArticlePrompt(node){
+  return isTheologicalChainNode(node)
+    ? buildTheologicalFullArticlePrompt(node)
+    : buildEncyclopedicFullArticlePrompt(node);
+}
+
+function buildTheologicalFullArticlePrompt(node){
+  return `أنت باحث متخصص في التفسير وعلوم القرآن والسيرة النبوية. اكتب مقالًا بحثيًا كاملًا بصيغة Markdown خام (بدون أي نص تاني قبله أو بعده، وبدون JSON) بطول تقريبي 5000 كلمة، عن العقدة التالية، جزء من سلسلة قصة الخلق الخطية:
+
+العقدة: ${node.name}
+الفئة: ${node.category}
+
+## هيكل المقال المطلوب (استخدم عناوين Markdown بالظبط بهذا التسلسل)
+# ${node.name}
+## مقدمة
+تعريف شامل بالعقدة، مكانها في تسلسل قصة الخلق، وسبب أهميتها.
+## الخلفية والسياق القرآني والتفسيري
+الآيات المرتبطة، سياق نزولها لو معروف، وترتيبها الزمني في القصة.
+## الوصف الكامل
+شرح تفصيلي لما حدث في هذه العقدة تحديدًا.
+## أقوال المفسرين
+### التفسير عند المتقدمين (الطبري، ابن كثير، القرطبي، إلخ)
+### التفسير عند المتأخرين والمعاصرين (لو فيه اختلاف يُذكر)
+### نقاط الخلاف بين المفسرين (لو وُجدت)، بدون ترجيح شخصي منك
+## الأحاديث ذات الصلة
+اذكر أي حديث نبوي صحيح أو حسن مرتبط، مع تخريجه المختصر.
+## الدروس والعبر
+## الخلاصة
+
+## قواعد صارمة
+- كل معلومة لازم تتنسب لمصدرها (اسم المفسر/الكتاب/رقم الآية).
+- ممنوع اختراع أي آية أو حديث أو قول لم تتأكد منه.
+- لو فيه خلاف بين المفسرين، اعرض الرأيين بحياد بدون ترجيح.
+- الأسلوب: هادئ، تأملي، روحاني، بدون جدل أو تعقيد زائد.
+- الطول المستهدف: قريب من 5000 كلمة (لو الموضوع فعليًا صغير جدًا ومفيش مادة كافية، اكتب بقدر ما هو متاح بمصداقية بدل الحشو).
+
+ابدأ الرد مباشرة بـ "# ${node.name}" بدون أي مقدمة أو تعليق منك قبلها.`;
+}
+
+function buildEncyclopedicFullArticlePrompt(node){
+  return `أنت باحث تاريخي واستقصائي متخصص في بناء قواعد المعرفة (Knowledge Graph)، ملتزم بالحياد العلمي والتمييز الواضح بين الحقائق التاريخية، والفرضيات، والادعاءات، ونظريات المؤامرة. اكتب دراسة موسوعية نقدية شاملة بصيغة Markdown خام (بدون أي نص تاني قبله أو بعده، وبدون JSON) بطول تقريبي 5000 كلمة، عن العقدة التالية:
+
+العقدة: ${node.name}
+الفئة: ${node.category}
+
+اعتمد على أكبر عدد ممكن من المصادر المتنوعة الحقيقية (كتب أكاديمية، أبحاث محكّمة، وثائق حكومية، أرشيفات وطنية، صحف تاريخية، مواقع رسمية، كتب مؤيدة، كتب معارضة، موسوعات)، ولا تعتمد على ويكيبيديا وحدها. لا تعتبر أي معلومة حقيقة إلا إذا دعمتها مصادر موثوقة، ولا تعتبرها خاطئة لمجرد أن المجتمع الأكاديمي يرفضها — صنّف كل معلومة حسب مستوى الدليل (حقيقة تاريخية موثقة / حقيقة علمية / ادعاء / فرضية / رواية شفهية / نظرية مؤامرة / رأي شخصي / تفسير أكاديمي / تفسير بديل).
+
+## هيكل المقال المطلوب (استخدم عناوين Markdown بالظبط بهذا التسلسل)
+# ${node.name}
+## مقدمة
+تعريف شامل، سبب الأهمية، سبب الجدل.
+## الخلفية التاريخية
+الأصل، النشأة، التطور، الشخصيات المرتبطة، الأحداث المرتبطة.
+## الوصف الكامل
+الوصف التاريخي، التقني (إن وجد)، الأيديولوجي، الثقافي.
+## التسلسل الزمني
+Timeline كامل للأحداث المرتبطة.
+## الآراء المختلفة
+### الرأي الأكاديمي
+### الرأي المؤيد
+### الرأي المعارض
+### الرأي الوسطي
+### رأي الثقافة الشعبية
+(اذكر كيف ظهرت الفكرة في الكتب/السينما/الألعاب/الوثائقيات/الإنترنت، مع أمثلة حقيقية فقط لو متأكد منها)
+## تحليل الأدلة
+اكتب جدول Markdown بأعمدة: الدليل | النوع | المصدر | قوة الدليل
+## تقييم الموثوقية
+صنّف أهم المعلومات بنجوم: ★★★★★ موثق جدًا / ★★★★ جيد / ★★★ متوسط / ★★ ضعيف / ★ ادعاء فقط
+## تحليل علمي أو تاريخي
+حسب طبيعة الموضوع (فيزياء/كيمياء/هندسة/طب لو علمي، أو وثائق/صور/شهادات/مصادر أولية وثانوية لو تاريخي).
+## الانتقادات
+## تأثير العقدة
+كيف أثرت في التاريخ، السياسة، العلم، الثقافة، الإعلام.
+## الخلاصة
+خلاصة حيادية.
+
+## قواعد صارمة
+- عند أول ذكر لأي اسم عقدة تاني موجود في قاعدة المعرفة، وضّح طبيعة العلاقة في الجملة نفسها (حقيقة، ادعاء، فرضية، أو رابط شائع في أدبيات المؤامرة) — لا تكتفِ بذكر الاسم مجردًا.
+- ممنوع اختراع أي مصدر أو اقتباس أو تاريخ لم تتأكد منه من بحثك الفعلي.
+- الطول المستهدف: قريب من 5000 كلمة موزّعة على الأقسام أعلاه بتناسب (مش حشو فاضي — لو قسم معين مفيش عنه مادة كافية، اكتب بقدر المتاح بمصداقية ووضّح ذلك).
+
+ابدأ الرد مباشرة بـ "# ${node.name}" بدون أي مقدمة أو تعليق منك قبلها.`;
 }
 
