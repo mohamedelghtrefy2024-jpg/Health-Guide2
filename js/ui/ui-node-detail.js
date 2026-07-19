@@ -483,10 +483,10 @@ function openArticleView(node){
     infoRows.map(([k,v])=>`<div class="av-row"><span>${k}</span><strong>${v}</strong></div>`).join('') +
     `</div>`;
 
-  // الملخص
+  // الملخص — بيتعامل معاه بنفس منطق الماركداون والتنسيق (ألوان/أحجام) بتاع باقي المقال، مش نص خام مختلف الشكل
   const summaryHtml = node.hubSummary
-    ? `<div class="av-summary">${escapeHtml(node.hubSummary).replace(/\n/g,'<br>')}</div>`
-    : `<div class="av-empty">لا يوجد ملخص بحث مسجّل لهذه العقدة بعد — استخدم زرار "🔍 جهّز طلب بحث" لتوليده.</div>`;
+    ? `<div class="av-summary">${(()=>{ const raw = window.marked ? window.marked.parse(node.hubSummary) : escapeHtml(node.hubSummary).replace(/\n/g,'<br>'); return typeof linkifyNodeMentions==='function' ? linkifyNodeMentions(raw) : raw; })()}</div>`
+    : `<div class="av-empty">لا يوجد ملخص بحث مسجّل لهذه العقدة بعد — استخدم زرار "🧾 جهّز طلب بحث ومقال كامل" لتوليده.</div>`;
 
   // المصادر
   const sourcesList = Array.isArray(node.sources) ? node.sources : [];

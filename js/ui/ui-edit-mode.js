@@ -167,7 +167,7 @@ ${chainNames}
 بعد ما تخلّص المقال كامل، ضيف السطر التالي بالظبط في سطر لوحده:
 ---JSON-DATA---
 وبعده كتلة \`\`\`json مباشرة فيها:
-- hubSummary: ملخص قصير 150-300 كلمة (منفصل عن المقال، يُستخدم كمعاينة سريعة)
+- hubSummary: انسخ فيه نفس نص قسم "## الخلاصة" اللي كتبته في المقال فوق بالظبط (مش كتابة جديدة منفصلة) — الهدف بس إتاحته كمعاينة سريعة في أماكن تانية بالموقع
 - sources: 2-5 مصادر حقيقية فقط
 - suggestedConnections: روابط استثنائية جدًا (بس لو فيه نص تفسيري أو حديثي صريح يربط هذه العقدة بعقدة تانية من نفس السلسلة، أو بشخصية دينية موثقة تاريخيًا زي ربط "تحوت" بـ"إدريس عليه السلام"). كل رابط: targetName (بالظبط مع #رقم)، reason (جملة كاملة بالمصدر)، type (religious/historical/alias)، strength (strong/medium).
 
@@ -238,7 +238,7 @@ ${indexText}
 بعد ما تخلّص المقال كامل، ضيف السطر التالي بالظبط في سطر لوحده:
 ---JSON-DATA---
 وبعده كتلة \`\`\`json مباشرة فيها:
-- hubSummary: ملخص قصير 150-300 كلمة (منفصل عن المقال، يُستخدم كمعاينة سريعة)، صنّف فيه طبيعة المعلومة صراحة زي ما فوق
+- hubSummary: انسخ فيه نفس نص قسم "## الخلاصة" اللي كتبته في المقال فوق بالظبط (مش كتابة جديدة منفصلة)، صنّف فيه طبيعة المعلومة صراحة زي ما فوق
 - sources: 2-6 مصادر حقيقية فقط
 - suggestedConnections: لكل رابط حقيقي وموثّق لقيته فعليًا من بحثك (مش تخمين ولا تشابه اسم/موضوع): targetName (بالظبط من الفهرس مع #رقم)، reason (جملة تعليل كاملة بمصدر الربط)، type (اختر من: alias, historical, thematic, evidence, organizational, opposing, claimed, speculative, conspiracy, popularized, debunked, disputed, indirect, influence, scientific, ideological, intelligence, financial, military, religious, cultural, symbolic)، strength (very_strong/strong/medium/weak/very_weak/unknown)، evidenceLevel (documented_fact/scientific_fact/claim/hypothesis/oral_account/conspiracy_theory/personal_opinion/academic_interpretation/alternative_interpretation)، sourceCategory (نوع المصدر كنص)
 
