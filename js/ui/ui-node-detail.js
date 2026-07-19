@@ -519,7 +519,7 @@ function openArticleView(node){
     : `<div class="av-empty">لا توجد اتصالات معلنة بعد.</div>`;
 
   // المقال/التحليل الشخصي (Markdown notes) لو موجود — يتحمّل من نفس تخزين الملاحظات
-  let notesHtml = `<div class="av-empty">لسه مفيش مقال شخصي مكتوب لهذه العقدة.</div>`;
+  let notesHtml = `<div class="av-empty">لسه مفيش بحث أو مقال مكتوب لهذه العقدة — استخدم زرار "🧾 جهّز طلب بحث ومقال كامل".</div>`;
   if(currentNode && currentNode.id === node.id && notesEl && notesEl.value && notesEl.value.trim()){
     const raw = window.marked ? window.marked.parse(notesEl.value) : escapeHtml(notesEl.value);
     notesHtml = `<div class="av-summary">${typeof linkifyNodeMentions==='function' ? linkifyNodeMentions(raw) : raw}</div>`;
@@ -529,10 +529,10 @@ function openArticleView(node){
     <div class="av-cat" style="color:${catColor}">${escapeHtml(node.category)} ${badges}</div>
     <div class="av-title">${escapeHtml(getDisplayName(node.name))}</div>
     ${infoboxHtml}
+    <div class="av-section av-notes"><h3>البحث والتحليل الكامل</h3>${notesHtml}</div>
     <div class="av-section"><h3>الملخص</h3>${summaryHtml}</div>
     <div class="av-section"><h3>المصادر</h3>${sourcesHtml}</div>
     <div class="av-section"><h3>العلاقات (${node.connections.length})</h3>${relHtml}</div>
-    <div class="av-section av-notes"><h3>المقال الشخصي / التحليل</h3>${notesHtml}</div>
   `;
   if(typeof bindMentionLinks === 'function') bindMentionLinks(articleViewBody);
 
