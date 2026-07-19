@@ -295,27 +295,32 @@ function parseUnifiedResponse(text){
   text = (text||'').trim();
   if(!text) throw new Error('المربع فاضي — الصق رد Claude الأول.');
 
-  // نلاقي آخر كتلة ```json ... ``` في الرد (المفروض تكون في الآخر بعد المقال)
-  const jsonFenceMatches = [...text.matchAll(/```json\s*([\s\S]*?)```/gi)];
   let jsonRaw, articleMarkdown;
+
+  // الحالة 1: كتلة ```json ... ``` (المتوقعة في آخر الرد بعد المقال)
+  const jsonFenceMatches = [...text.matchAll(/```json\s*([\s\S]*?)```/gi)];
   if(jsonFenceMatches.length){
     const last = jsonFenceMatches[jsonFenceMatches.length-1];
     jsonRaw = last[1];
     articleMarkdown = text.slice(0, last.index).replace(/---JSON-DATA---\s*$/,'').trim();
   } else {
-    // fallback: مفيش ```json fence — نجرب نلاقي أول { بعد ماركر ---JSON-DATA--- أو من آخر السطر اللي فيه {
+    // الحالة 2: مفيش ```json fence لكن فيه ماركر ---JSON-DATA---
     const markerIdx = text.indexOf('---JSON-DATA---');
     if(markerIdx !== -1){
       articleMarkdown = text.slice(0, markerIdx).trim();
       jsonRaw = text.slice(markerIdx + '---JSON-DATA---'.length);
+    } else if(text.startsWith('{') && text.endsWith('}')){
+      // الحالة 3: الرد كله JSON خام بدون مقال وبدون أي فواصل — نعتبره الجزء التاني بس، والمقال فاضي
+      jsonRaw = text;
+      articleMarkdown = '';
     } else {
-      throw new Error('معرفتش ألاقي كتلة JSON في الرد — تأكد إن الرد فيه المقال كامل وبعده كتلة ```json``` في الآخر.');
+      throw new Error('معرفتش ألاقي كتلة JSON في الرد — تأكد إن الرد فيه المقال كامل وبعده كتلة ```json``` في الآخر، أو الصق JSON خام بس.');
     }
   }
 
   let parsed;
   try{ parsed = JSON.parse(jsonRaw.trim()); }
-  catch(e){ throw new Error('كتلة الـ JSON في آخر الرد مش صحيحة الصياغة — تأكد إنك لاصق الرد كامل بدون تعديل.'); }
+  catch(e){ throw new Error('كتلة الـ JSON مش صحيحة الصياغة — تأكد إنك لاصق الرد كامل بدون تعديل.'); }
   if(typeof parsed !== 'object' || parsed===null) throw new Error('شكل بيانات JSON غير متوقع.');
 
   return { articleMarkdown, parsed };
