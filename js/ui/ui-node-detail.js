@@ -485,7 +485,7 @@ function openArticleView(node){
 
   // الملخص — بيتعامل معاه بنفس منطق الماركداون والتنسيق (ألوان/أحجام) بتاع باقي المقال، مش نص خام مختلف الشكل
   const summaryHtml = node.hubSummary
-    ? `<div class="av-summary">${(()=>{ const raw = window.marked ? window.marked.parse(node.hubSummary) : escapeHtml(node.hubSummary).replace(/\n/g,'<br>'); return typeof linkifyNodeMentions==='function' ? linkifyNodeMentions(raw) : raw; })()}</div>`
+    ? `<div class="av-summary">${(()=>{ const formatted = typeof smartFormatArticle==='function' ? smartFormatArticle(node.hubSummary, false) : node.hubSummary; const raw = window.marked ? window.marked.parse(formatted) : escapeHtml(node.hubSummary).replace(/\n/g,'<br>'); return typeof linkifyNodeMentions==='function' ? linkifyNodeMentions(raw) : raw; })()}</div>`
     : `<div class="av-empty">لا يوجد ملخص بحث مسجّل لهذه العقدة بعد — استخدم زرار "🧾 جهّز طلب بحث ومقال كامل" لتوليده.</div>`;
 
   // المصادر
@@ -521,7 +521,8 @@ function openArticleView(node){
   // المقال/التحليل الشخصي (Markdown notes) لو موجود — يتحمّل من نفس تخزين الملاحظات
   let notesHtml = `<div class="av-empty">لسه مفيش بحث أو مقال مكتوب لهذه العقدة — استخدم زرار "🧾 جهّز طلب بحث ومقال كامل".</div>`;
   if(currentNode && currentNode.id === node.id && notesEl && notesEl.value && notesEl.value.trim()){
-    const raw = window.marked ? window.marked.parse(notesEl.value) : escapeHtml(notesEl.value);
+    const formatted = typeof smartFormatArticle==='function' ? smartFormatArticle(notesEl.value) : notesEl.value;
+    const raw = window.marked ? window.marked.parse(formatted) : escapeHtml(notesEl.value);
     notesHtml = `<div class="av-summary">${typeof linkifyNodeMentions==='function' ? linkifyNodeMentions(raw) : raw}</div>`;
   }
 

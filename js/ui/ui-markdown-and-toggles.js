@@ -29,6 +29,47 @@ function bindMentionLinks(container){
   });
 }
 
+// ---- التعرف التلقائي على العناوين جوه المقال حتى لو الموديل ما كتبش #/##/### فعليًا ----
+// (بنعتمد على شكل السطر: قصير، من غير نقطة/فاصلة في الآخر، مش جوه اقتباس آية أو حديث)
+const ARTICLE_MAIN_TITLES = [
+  'مقدمة','الخلفية والسياق القرآني والتفسيري','الخلفية التاريخية','الوصف الكامل',
+  'التسلسل الزمني','أقوال المفسرين','الآراء المختلفة','الأحاديث ذات الصلة',
+  'تحليل الأدلة','تقييم الموثوقية','تحليل علمي أو تاريخي','تحليل علمي','تحليل تاريخي',
+  'الانتقادات','تأثير العقدة','الدروس والعبر','الخلاصة'
+];
+function looksLikeHeadingLine(t){
+  if(!t || t.length < 2 || t.length > 90) return false;
+  if(/[﴿﴾«»]/.test(t)) return false; // اقتباس آية أو حديث مش عنوان
+  const lastChar = t[t.length-1];
+  if('.,،؛؟!»﴾"\'-–—'.includes(lastChar)) return false;
+  if(/[.؟!]/.test(t.slice(0,-1))) return false; // فيه نقطة جوه السطر يبقى غالبًا جملة كاملة مش عنوان
+  return true;
+}
+function smartFormatArticle(text, treatFirstLineAsTitle){
+  if(treatFirstLineAsTitle === undefined) treatFirstLineAsTitle = true;
+  if(!text) return text;
+  const lines = text.split('\n');
+  const out = [];
+  let firstContentSeen = false;
+  for(const raw of lines){
+    const stripped = raw.replace(/^#{1,6}\s*/, '').trim();
+    if(stripped === ''){ out.push(raw); continue; }
+    if(!firstContentSeen){
+      firstContentSeen = true;
+      if(treatFirstLineAsTitle){ out.push('# ' + stripped); continue; }
+      // مش عنوان — كمّل التحقق العادي بدل ما نحطها H1 تلقائي
+    }
+    const isKnownMain = ARTICLE_MAIN_TITLES.some(t2 => stripped === t2 || stripped.startsWith(t2+' ') || stripped.startsWith(t2+'('));
+    if(isKnownMain){ out.push('## ' + stripped); continue; }
+    if(/^#{1,6}\s/.test(raw) || looksLikeHeadingLine(stripped)){
+      out.push('### ' + stripped);
+      continue;
+    }
+    out.push(raw);
+  }
+  return out.join('\n');
+}
+
 // ---- markdown article edit/preview tabs ----
 const tabEdit = document.getElementById('tabEdit');
 const tabPreview = document.getElementById('tabPreview');
@@ -41,7 +82,7 @@ tabPreview.onclick = ()=>{
   tabPreview.classList.add('active'); tabEdit.classList.remove('active');
   notesEl.style.display = 'none'; articlePreview.style.display = 'block';
   try{
-    const raw = window.marked ? window.marked.parse(notesEl.value || '') : notesEl.value;
+    const raw = window.marked ? window.marked.parse(smartFormatArticle(notesEl.value || '')) : notesEl.value;
     articlePreview.innerHTML = linkifyNodeMentions(raw);
     bindMentionLinks(articlePreview);
   }catch(e){
