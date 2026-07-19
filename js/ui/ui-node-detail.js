@@ -521,7 +521,8 @@ function openArticleView(node){
   // المقال/التحليل الشخصي (Markdown notes) لو موجود — يتحمّل من نفس تخزين الملاحظات
   let notesHtml = `<div class="av-empty">لسه مفيش مقال شخصي مكتوب لهذه العقدة.</div>`;
   if(currentNode && currentNode.id === node.id && notesEl && notesEl.value && notesEl.value.trim()){
-    notesHtml = `<div class="av-summary">${window.marked ? window.marked.parse(notesEl.value) : escapeHtml(notesEl.value)}</div>`;
+    const raw = window.marked ? window.marked.parse(notesEl.value) : escapeHtml(notesEl.value);
+    notesHtml = `<div class="av-summary">${typeof linkifyNodeMentions==='function' ? linkifyNodeMentions(raw) : raw}</div>`;
   }
 
   articleViewBody.innerHTML = `
@@ -533,6 +534,7 @@ function openArticleView(node){
     <div class="av-section"><h3>العلاقات (${node.connections.length})</h3>${relHtml}</div>
     <div class="av-section av-notes"><h3>المقال الشخصي / التحليل</h3>${notesHtml}</div>
   `;
+  if(typeof bindMentionLinks === 'function') bindMentionLinks(articleViewBody);
 
   articleViewOverlay.classList.add('show');
 }

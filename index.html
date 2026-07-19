@@ -322,6 +322,9 @@
   #articlePreview h3, #articlePreview h4{ color:var(--accent-2); margin:var(--space-5) 0 var(--space-3); font-weight:700; }
   #articlePreview p, #articlePreview li{ color:var(--text); margin:var(--space-3) 0; }
   #articlePreview strong{ color:var(--accent); }
+  .mention-link{ color:var(--accent-2); text-decoration:underline; text-decoration-style:dotted; cursor:pointer; font-weight:600; }
+  .mention-link:hover{ color:var(--accent); }
+  .mention-link .mention-id{ font-size:0.8em; opacity:0.7; }
   #articlePreview code{ background:var(--panel); padding:var(--space-odd-1) var(--space-odd-5); border-radius:var(--radius-xs); font-family:var(--font-mono); }
   #articlePreview a{ color:var(--accent-2); }
   /* ---- Component: Modal Overlay backdrop (shared base rule).
@@ -693,7 +696,7 @@
   .rp-conn-row .rp-conn-reason{ color:var(--muted); font-size:var(--fs-xs); }
   .rp-conn-row.rp-unmatched{ opacity:.55; }
   .rp-apply-actions{ margin-top:var(--space-7); }
-  #addToPathBtn, #researchNodeBtn, #fullArticleBtn, #openArticleViewBtn{ display:block; width:100%; box-sizing:border-box; margin-top:var(--space-4); }
+  #addToPathBtn, #researchNodeBtn, #openArticleViewBtn{ display:block; width:100%; box-sizing:border-box; margin-top:var(--space-4); }
   .node-mention{ color:var(--accent-2); text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
   .node-mention:hover{ opacity:.8; }
 </style>
@@ -786,8 +789,7 @@
     <div class="drawer-cat" id="dCat"></div>
     <div class="drawer-name" id="dName"></div>
     <button id="addToPathBtn" title="أضف هذه العقدة لمسار التحقيق النشط">➕ أضف لمسار التحقيق</button>
-    <button id="researchNodeBtn" title="جهّز طلب بحث خارجي لهذه العقدة (ملخص قصير + مصادر + روابط)">🔍 جهّز طلب بحث</button>
-    <button id="fullArticleBtn" title="جهّز طلب مقال بحثي كامل (~5000 كلمة) حسب البرومبت القياسي">📚 جهّز طلب المقال الكامل</button>
+    <button id="researchNodeBtn" title="جهّز طلب بحث شامل: مقال كامل (~5000 كلمة) + مصادر وروابط للشبكة">🧾 جهّز طلب بحث ومقال كامل</button>
     <button id="openArticleViewBtn" title="اعرض كل المعلومات المستنتجة لهذه العقدة كصفحة كاملة">📄 عرض المقال الكامل</button>
     <div id="moveRow" style="display:none; margin-top:10px;">
       <label style="font-size:11px; color:var(--muted); display:block; margin-bottom:4px;">نقل لفئة تانية:</label>
@@ -904,10 +906,10 @@
 <div id="researchOverlay">
   <div id="researchModal">
     <button class="drawer-close" id="closeResearch">×</button>
-    <h3 id="researchModalTitle">🔍 بحث خارجي لهذه العقدة</h3>
+    <h3 id="researchModalTitle">🧾 بحث ومقال كامل لهذه العقدة</h3>
     <p class="analysis-hint" id="researchModalHint">
-      الخطوة 1: انسخ النص تحت والصقه في محادثة مع Claude (لازم بحث الويب مفعّل عندها).<br>
-      الخطوة 2: الصق رد Claude (JSON) في المربع التاني، وهيبان لك معاينة قبل ما نطبّق أي حاجة على الموقع.
+      الخطوة 1: انسخ النص تحت والصقه في محادثة مع Claude (لازم بحث الويب مفعّل عندها). هيرجّعلك مقال كامل (~5000 كلمة) + كتلة بيانات JSON في الآخر.<br>
+      الخطوة 2: الصق الرد كامل (المقال + الـ JSON) زي ما هو في المربع التاني — من غير ما تقص أو تعدّل حاجة — واضغط "معاينة"، وهيبان لك المقال والروابط المقترحة قبل ما نطبّق أي حاجة.
     </p>
     <label>1) طلب البحث الجاهز</label>
     <textarea id="researchPromptOut" readonly></textarea>
@@ -915,16 +917,13 @@
       <button id="copyResearchPromptBtn" class="analysis-primary-btn">📋 نسخ النص</button>
     </div>
     <div id="researchJsonImportSection">
-      <label>2) الصق رد Claude هنا (JSON)</label>
-      <textarea id="researchImportIn" placeholder='{"hubSummary": "...", "sources":[...], "suggestedConnections":[...]}'></textarea>
+      <label>2) الصق الرد الكامل هنا (المقال + JSON)</label>
+      <textarea id="researchImportIn" placeholder="الصق هنا رد Claude كامل: المقال بصيغة Markdown ثم كتلة JSON في الآخر"></textarea>
       <div class="modal-actions" style="justify-content:flex-start;">
         <button id="previewResearchBtn" class="analysis-primary-btn">👁️ معاينة</button>
       </div>
       <div id="researchPreview"></div>
     </div>
-    <p class="analysis-hint" id="fullArticleHint" style="display:none;">
-      2) الصق رد Claude (نص Markdown طويل) في تبويب <strong>"تعديل"</strong> بتاع الملاحظات (مش هنا)، واحفظ. هيظهر ملوّنًا تلقائيًا في "📄 عرض المقال الكامل" وفي "🔍 وضع القراءة".
-    </p>
   </div>
 </div>
 

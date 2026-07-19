@@ -107,6 +107,9 @@ function isTheologicalChainNode(node){
 }
 
 function buildResearchPrompt(node){
+  return buildUnifiedResearchPrompt(node);
+}
+function buildUnifiedResearchPrompt(node){
   const existingConn = (node.connections||[]).join('، ') || 'لا يوجد';
   const existingSources = Array.isArray(node.sources) && node.sources.length
     ? node.sources.map(s=> `- ${s.label} — ${s.url}`).join('\n')
@@ -114,20 +117,18 @@ function buildResearchPrompt(node){
   const existingSummary = node.hubSummary ? node.hubSummary : '(لا يوجد)';
 
   return isTheologicalChainNode(node)
-    ? buildTheologicalChainPrompt(node, existingConn, existingSources, existingSummary)
-    : buildFullEncyclopedicPrompt(node, existingConn, existingSources, existingSummary);
+    ? buildTheologicalUnifiedPrompt(node, existingConn, existingSources, existingSummary)
+    : buildEncyclopedicUnifiedPrompt(node, existingConn, existingSources, existingSummary);
 }
 
-// ---- الصيغة B: السلسلة اللاهوتية الخطية (عقد 1 لحد 12.1) ----
-function buildTheologicalChainPrompt(node, existingConn, existingSources, existingSummary){
-  // فهرس مصغّر: بس عقد السلسلة نفسها + أي عقدة عندها ربط ديني موثق فعلاً (parentHub) —
-  // مش الفهرس الكامل لأكتر من 1200 عقدة، عشان مفيش مجال للربط العشوائي بموضوعات حديثة بعيدة.
+// ---- الصيغة B: السلسلة اللاهوتية الخطية (عقد 1 لحد 12.1) — مقال + JSON في رد واحد ----
+function buildTheologicalUnifiedPrompt(node, existingConn, existingSources, existingSummary){
   const chainNames = nodes
     .filter(n=> THEOLOGICAL_CHAIN_IDS.has(n.id))
     .map(n=> `${n.name} [#${n.id}]`)
     .join(' | ');
 
-  return `أنت باحث متخصص في التفسير وعلوم القرآن والسيرة النبوية. مطلوب منك بحث حقيقي وموثّق (تفاسير معتمدة، أحاديث، مصادر أكاديمية إسلامية)، بدون اختراع أي معلومة أو مصدر.
+  return `أنت باحث متخصص في التفسير وعلوم القرآن والسيرة النبوية. مطلوب منك رد واحد فيه جزءان، بحث حقيقي وموثّق (تفاسير معتمدة، أحاديث، مصادر أكاديمية إسلامية)، بدون اختراع أي معلومة أو مصدر.
 
 ## العقدة المطلوب البحث عنها
 الاسم: ${node.name}
@@ -138,36 +139,62 @@ function buildTheologicalChainPrompt(node, existingConn, existingSources, existi
 المصادر الحالية (لو موجودة):
 ${existingSources}
 
-## المطلوب بالظبط
-1. ابحث فعليًا (تفسير الطبري، ابن كثير، القرطبي، أو مصادر علمية معتمدة عن قصص الأنبياء) — لو مش قادر تبحث، قول كده صراحة ومتكملش.
-2. اكتب ملخصًا (hubSummary) بالعربية، 150-300 كلمة، يعرض الأقوال المختلفة للمفسرين لو فيه خلاف بينهم، بدون ترجيح شخصي.
-3. اذكر 2-5 مصادر حقيقية (كتب تفسير أو مواقع علمية موثوقة)، وممنوع اختراع أي رابط أو عنوان.
-4. الروابط المقترحة (suggestedConnections) هنا استثنائية جدًا: اقترح ربط فقط لو فيه نص تفسيري أو حديثي صريح يربط هذه العقدة بعقدة تانية من نفس السلسلة (المذكورة تحت)، أو بشخصية دينية موثقة تاريخيًا خارج السلسلة (مثال: نسب بعض المفسرين شخصية "تحوت" المصرية القديمة إلى "إدريس عليه السلام"). لو مفيش نص صريح، سيب suggestedConnections فاضية تمامًا — ممنوع الربط بمجرد التشابه الموضوعي أو اللغوي.
-5. لكل رابط مقترح (لو وُجد) اكتب: الاسم بالظبط مع رقم الـ#، وجملة تعليل كاملة تذكر المصدر التفسيري، ونوعه (اختر واحد: religious, historical, alias)، وقوته (strong لو نص صريح متفق عليه، medium لو خلافي بين المفسرين).
+## الجزء الأول — المقال الكامل (Markdown خام، طوله التقريبي 5000 كلمة)
+اكتب مقالًا بحثيًا كاملًا بهذا الهيكل بالظبط:
+# ${node.name}
+## مقدمة
+## الخلفية والسياق القرآني والتفسيري
+## الوصف الكامل
+## أقوال المفسرين
+### التفسير عند المتقدمين (الطبري، ابن كثير، القرطبي، إلخ)
+### التفسير عند المتأخرين والمعاصرين (لو فيه اختلاف يُذكر)
+### نقاط الخلاف بين المفسرين (لو وُجدت)، بدون ترجيح شخصي منك
+## الأحاديث ذات الصلة
+## الدروس والعبر
+## الخلاصة
 
-## عقد السلسلة اللاهوتية (للسياق فقط، مش للبحث عنها)
+قواعد المقال:
+- كل معلومة لازم تتنسب لمصدرها (اسم المفسر/الكتاب/رقم الآية). ممنوع اختراع أي آية أو حديث أو قول لم تتأكد منه.
+- لو فيه خلاف بين المفسرين، اعرض الرأيين بحياد بدون ترجيح.
+- الأسلوب: هادئ، تأملي، روحاني، بدون جدل أو تعقيد زائد.
+- الطول المستهدف: قريب من 5000 كلمة (لو مفيش مادة كافية، اكتب بقدر ما هو متاح بمصداقية بدل الحشو).
+- عند ذكر أي عقدة من "عقد السلسلة اللاهوتية" تحت جوه متن المقال، اكتبها بصيغة "الاسم [#رقم]" بالظبط زي ما هي مكتوبة، عشان تبقى قابلة للربط.
+
+## عقد السلسلة اللاهوتية (للسياق وللربط الداخلي جوه المقال فقط)
 ${chainNames}
 
-## صيغة الرد المطلوبة (JSON فقط، بدون أي نص تاني قبله أو بعده)
+## الجزء الثاني — بيانات مهيكلة (JSON)
+بعد ما تخلّص المقال كامل، ضيف السطر التالي بالظبط في سطر لوحده:
+---JSON-DATA---
+وبعده كتلة \`\`\`json مباشرة فيها:
+- hubSummary: ملخص قصير 150-300 كلمة (منفصل عن المقال، يُستخدم كمعاينة سريعة)
+- sources: 2-5 مصادر حقيقية فقط
+- suggestedConnections: روابط استثنائية جدًا (بس لو فيه نص تفسيري أو حديثي صريح يربط هذه العقدة بعقدة تانية من نفس السلسلة، أو بشخصية دينية موثقة تاريخيًا زي ربط "تحوت" بـ"إدريس عليه السلام"). كل رابط: targetName (بالظبط مع #رقم)، reason (جملة كاملة بالمصدر)، type (religious/historical/alias)، strength (strong/medium).
+
+مثال شكل الكتلة:
+\`\`\`json
 {
-  "hubSummary": "نص الملخص هنا أو فاضي",
-  "sources": [{"label": "اسم المصدر", "url": "https://..."}],
-  "suggestedConnections": [
-    {"targetName": "الاسم بالظبط مع رقم الـ#", "reason": "جملة تعليل كاملة تذكر المصدر التفسيري", "type": "religious", "strength": "strong"}
-  ]
-}`;
+  "hubSummary": "...",
+  "sources": [{"label": "...", "url": "https://..."}],
+  "suggestedConnections": [{"targetName": "الاسم [#رقم]", "reason": "...", "type": "religious", "strength": "strong"}]
+}
+\`\`\`
+
+ابدأ الرد مباشرة بـ "# ${node.name}" بدون أي مقدمة أو تعليق منك قبلها، وخلّي كتلة الـ JSON آخر حاجة في الرد.`;
 }
 
-// ---- الصيغة A: الشبكة الموسوعية الكاملة (عقد 13.0 فما فوق) ----
-function buildFullEncyclopedicPrompt(node, existingConn, existingSources, existingSummary){
+// ---- الصيغة A: الشبكة الموسوعية الكاملة (عقد 13.0 فما فوق) — مقال + JSON في رد واحد ----
+function buildEncyclopedicUnifiedPrompt(node, existingConn, existingSources, existingSummary){
   const byCat = {};
   nodes.forEach(n=>{
-    if(THEOLOGICAL_CHAIN_IDS.has(n.id)) return; // السلسلة اللاهوتية مستبعدة من فهرس الربط هنا
+    if(THEOLOGICAL_CHAIN_IDS.has(n.id)) return;
     (byCat[n.category] = byCat[n.category]||[]).push(`${n.name} [#${n.id}]`);
   });
   const indexText = Object.keys(byCat).sort().map(cat=> `### ${cat}\n${byCat[cat].join(' | ')}`).join('\n\n');
 
-  return `أنت باحث تاريخي واستقصائي متخصص في بناء قواعد المعرفة (Knowledge Graph)، ملتزم بالحياد العلمي والتمييز بين الحقائق والادعاءات والفرضيات ونظريات المؤامرة. مطلوب منك بحث حقيقي على الويب، بدون اختراع أي معلومة أو مصدر.
+  return `أنت باحث تاريخي واستقصائي متخصص في بناء قواعد المعرفة (Knowledge Graph)، ملتزم بالحياد العلمي والتمييز الواضح بين الحقائق التاريخية، والفرضيات، والادعاءات، ونظريات المؤامرة. مطلوب منك رد واحد فيه جزءان، بدون اختراع أي معلومة أو مصدر.
+
+اعتمد على أكبر عدد ممكن من المصادر المتنوعة الحقيقية (كتب أكاديمية، أبحاث محكّمة، وثائق حكومية، أرشيفات وطنية، صحف تاريخية، مواقع رسمية، كتب مؤيدة، كتب معارضة، موسوعات)، ولا تعتمد على ويكيبيديا وحدها. صنّف كل معلومة حسب مستوى الدليل (حقيقة تاريخية موثقة / حقيقة علمية / ادعاء / فرضية / رواية شفهية / نظرية مؤامرة / رأي شخصي / تفسير أكاديمي / تفسير بديل).
 
 ## العقدة المطلوب البحث عنها
 الاسم: ${node.name}
@@ -177,68 +204,75 @@ function buildFullEncyclopedicPrompt(node, existingConn, existingSources, existi
 المصادر الحالية (لو موجودة):
 ${existingSources}
 
-## المطلوب بالظبط
-1. ابحث فعليًا على الويب (لو مش قادر تبحث، قول كده صراحة ومتكملش).
-2. اكتب ملخصًا (hubSummary) بالعربية، 150-300 كلمة، محايد تمامًا. صنّف طبيعة المعلومة صراحة داخل الملخص نفسه (حقيقة تاريخية موثقة / حقيقة علمية / ادعاء / فرضية / رواية شفهية / نظرية مؤامرة / تفسير أكاديمي / تفسير بديل) — لا تقدّم أي ادعاء أو نظرية كحقيقة مؤكدة.
-3. اذكر 2-6 مصادر حقيقية فقط (روابط قابلة للتحقق فعليًا من نتائج بحثك). ممنوع اختراع أي رابط أو عنوان.
-4. من "فهرس العقد الموجودة بالفعل" تحت، حدد فقط الأسماء اللي لقيت رابطًا حقيقيًا وموثّقًا بينها وبين "${node.name}" استنادًا لنتائج بحثك الفعلية — مش بمجرد تشابه الاسم، أو تشابه الموضوع العام (زي "سيطرة" أو "نخبة")، أو التخمين. لو مش متأكد من وجود رابط موثّق، لا تقترحه إطلاقًا وسيبه برا القائمة.
-5. لكل رابط مقترح اكتب بالتفصيل:
-   - targetName: الاسم بالظبط زي ما هو مكتوب في الفهرس (بما فيه رقم الـ#)
-   - reason: جملة تعليل كاملة (مش مجرد "مرتبط بـ") توضح مين قال إيه ولية، ومصدر هذا الربط تحديدًا
-   - type: اختر الأدق من: alias, historical, thematic, evidence, organizational, opposing, claimed, speculative, conspiracy, popularized, debunked, disputed, indirect, influence, scientific, ideological, intelligence, financial, military, religious, cultural, symbolic
-   - strength: very_strong, strong, medium, weak, very_weak, unknown
-   - evidenceLevel: documented_fact, scientific_fact, claim, hypothesis, oral_account, conspiracy_theory, personal_opinion, academic_interpretation, alternative_interpretation
-   - sourceCategory: اذكر نوع المصدر (مثال: "كتاب أكاديمي"، "أدبيات مؤامرة"، "وثيقة حكومية مفرج عنها"، "فيلم وثائقي")
-6. لو مفيش معلومات موثوقة كافية عن الموضوع، رجّع hubSummary وsources فاضيين ووضّح السبب، وماتخترعش حاجة.
+## الجزء الأول — المقال الكامل (Markdown خام، طوله التقريبي 5000 كلمة)
+اكتب دراسة موسوعية نقدية شاملة بهذا الهيكل بالظبط:
+# ${node.name}
+## مقدمة
+## الخلفية التاريخية
+## الوصف الكامل
+## التسلسل الزمني
+## الآراء المختلفة
+### الرأي الأكاديمي
+### الرأي المؤيد
+### الرأي المعارض
+### الرأي الوسطي
+### رأي الثقافة الشعبية
+## تحليل الأدلة
+اكتب جدول Markdown بأعمدة: الدليل | النوع | المصدر | قوة الدليل
+## تقييم الموثوقية
+صنّف أهم المعلومات بنجوم: ★★★★★ موثق جدًا / ★★★★ جيد / ★★★ متوسط / ★★ ضعيف / ★ ادعاء فقط
+## تحليل علمي أو تاريخي
+## الانتقادات
+## تأثير العقدة
+## الخلاصة
 
-## فهرس العقد الموجودة بالفعل (للربط بينها وبين الموضوع فقط، مش للبحث عنها — السلسلة اللاهوتية 1-12.1 مستبعدة من هذا الفهرس لأنها سلسلة منفصلة)
+قواعد المقال:
+- عند أول ذكر لأي عقدة تانية موجودة في "فهرس العقد" تحت جوه متن المقال، اكتبها بصيغة "الاسم [#رقم]" بالظبط، ووضّح طبيعة العلاقة في نفس الجملة (حقيقة، ادعاء، فرضية، أو رابط شائع في أدبيات المؤامرة) — لا تكتفِ بذكر الاسم مجردًا.
+- ممنوع اختراع أي مصدر أو اقتباس أو تاريخ لم تتأكد منه من بحثك الفعلي.
+- الطول المستهدف: قريب من 5000 كلمة موزّعة بتناسب على الأقسام (مش حشو فاضي).
+
+## فهرس العقد الموجودة بالفعل (للربط جوه المقال ومن ضمن suggestedConnections تحت — السلسلة اللاهوتية 1-12.1 مستبعدة لأنها سلسلة منفصلة)
 ${indexText}
 
-## صيغة الرد المطلوبة (JSON فقط، بدون أي نص تاني قبله أو بعده)
+## الجزء الثاني — بيانات مهيكلة (JSON)
+بعد ما تخلّص المقال كامل، ضيف السطر التالي بالظبط في سطر لوحده:
+---JSON-DATA---
+وبعده كتلة \`\`\`json مباشرة فيها:
+- hubSummary: ملخص قصير 150-300 كلمة (منفصل عن المقال، يُستخدم كمعاينة سريعة)، صنّف فيه طبيعة المعلومة صراحة زي ما فوق
+- sources: 2-6 مصادر حقيقية فقط
+- suggestedConnections: لكل رابط حقيقي وموثّق لقيته فعليًا من بحثك (مش تخمين ولا تشابه اسم/موضوع): targetName (بالظبط من الفهرس مع #رقم)، reason (جملة تعليل كاملة بمصدر الربط)، type (اختر من: alias, historical, thematic, evidence, organizational, opposing, claimed, speculative, conspiracy, popularized, debunked, disputed, indirect, influence, scientific, ideological, intelligence, financial, military, religious, cultural, symbolic)، strength (very_strong/strong/medium/weak/very_weak/unknown)، evidenceLevel (documented_fact/scientific_fact/claim/hypothesis/oral_account/conspiracy_theory/personal_opinion/academic_interpretation/alternative_interpretation)، sourceCategory (نوع المصدر كنص)
+
+مثال شكل الكتلة:
+\`\`\`json
 {
-  "hubSummary": "نص الملخص هنا أو فاضي",
-  "sources": [{"label": "اسم المصدر", "url": "https://..."}],
-  "suggestedConnections": [
-    {
-      "targetName": "الاسم بالظبط من الفهرس مع رقم الـ#",
-      "reason": "جملة تعليل كاملة تذكر مصدر الربط ومين يقول بيه",
-      "type": "thematic",
-      "strength": "medium",
-      "evidenceLevel": "claim",
-      "sourceCategory": "نوع المصدر هنا"
-    }
-  ]
-}`;
+  "hubSummary": "...",
+  "sources": [{"label": "...", "url": "https://..."}],
+  "suggestedConnections": [{"targetName": "الاسم [#رقم]", "reason": "...", "type": "thematic", "strength": "medium", "evidenceLevel": "claim", "sourceCategory": "..."}]
+}
+\`\`\`
+
+لو مفيش معلومات موثوقة كافية عن الموضوع، رجّع hubSummary وsources فاضيين ووضّح السبب جوه المقال نفسه، وماتخترعش حاجة.
+
+ابدأ الرد مباشرة بـ "# ${node.name}" بدون أي مقدمة أو تعليق منك قبلها، وخلّي كتلة الـ JSON آخر حاجة في الرد.`;
 }
 
 const researchOverlay = document.getElementById('researchOverlay');
 const researchNodeBtnEl = document.getElementById('researchNodeBtn');
-const fullArticleBtnEl = document.getElementById('fullArticleBtn');
 const researchPromptOut = document.getElementById('researchPromptOut');
 const researchImportIn = document.getElementById('researchImportIn');
 const researchPreviewEl = document.getElementById('researchPreview');
-const researchModalTitle = document.getElementById('researchModalTitle');
-const researchModalHint = document.getElementById('researchModalHint');
-const researchJsonImportSection = document.getElementById('researchJsonImportSection');
-const fullArticleHint = document.getElementById('fullArticleHint');
 let lastResearchParsed = null;
 
-function openResearchModal(mode){
+function openResearchModal(){
   if(!researchOverlay || !currentNode) return;
-  const isArticleMode = mode === 'article';
-  researchPromptOut.value = isArticleMode ? buildFullArticlePrompt(currentNode) : buildResearchPrompt(currentNode);
+  researchPromptOut.value = buildUnifiedResearchPrompt(currentNode);
   researchImportIn.value = '';
   researchPreviewEl.innerHTML = '';
   lastResearchParsed = null;
-  if(researchModalTitle) researchModalTitle.textContent = isArticleMode ? '📚 طلب مقال بحثي كامل (~5000 كلمة)' : '🔍 بحث خارجي لهذه العقدة';
-  if(researchModalHint) researchModalHint.style.display = isArticleMode ? 'none' : '';
-  if(researchJsonImportSection) researchJsonImportSection.style.display = isArticleMode ? 'none' : '';
-  if(fullArticleHint) fullArticleHint.style.display = isArticleMode ? '' : 'none';
   UI.Modal.open('researchOverlay');
 }
 function closeResearchModal(){ if(researchOverlay) UI.Modal.close('researchOverlay'); }
-if(researchNodeBtnEl) researchNodeBtnEl.onclick = ()=> openResearchModal('quick');
-if(fullArticleBtnEl) fullArticleBtnEl.onclick = ()=> openResearchModal('article');
+if(researchNodeBtnEl) researchNodeBtnEl.onclick = openResearchModal;
 const closeResearchBtn = document.getElementById('closeResearch');
 if(closeResearchBtn) closeResearchBtn.onclick = closeResearchModal;
 if(researchOverlay) researchOverlay.onclick = (e)=>{ if(e.target===researchOverlay) closeResearchModal(); };
@@ -257,24 +291,44 @@ if(copyResearchPromptBtn){
   };
 }
 
-function parseResearchJson(text){
+function parseUnifiedResponse(text){
   text = (text||'').trim();
-  // إزالة أي ```json fences لو المستخدم لصقها زي ما هي من الرد
-  text = text.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
+  if(!text) throw new Error('المربع فاضي — الصق رد Claude الأول.');
+
+  // نلاقي آخر كتلة ```json ... ``` في الرد (المفروض تكون في الآخر بعد المقال)
+  const jsonFenceMatches = [...text.matchAll(/```json\s*([\s\S]*?)```/gi)];
+  let jsonRaw, articleMarkdown;
+  if(jsonFenceMatches.length){
+    const last = jsonFenceMatches[jsonFenceMatches.length-1];
+    jsonRaw = last[1];
+    articleMarkdown = text.slice(0, last.index).replace(/---JSON-DATA---\s*$/,'').trim();
+  } else {
+    // fallback: مفيش ```json fence — نجرب نلاقي أول { بعد ماركر ---JSON-DATA--- أو من آخر السطر اللي فيه {
+    const markerIdx = text.indexOf('---JSON-DATA---');
+    if(markerIdx !== -1){
+      articleMarkdown = text.slice(0, markerIdx).trim();
+      jsonRaw = text.slice(markerIdx + '---JSON-DATA---'.length);
+    } else {
+      throw new Error('معرفتش ألاقي كتلة JSON في الرد — تأكد إن الرد فيه المقال كامل وبعده كتلة ```json``` في الآخر.');
+    }
+  }
+
   let parsed;
-  try{ parsed = JSON.parse(text); }
-  catch(e){ throw new Error('الـ JSON مش صحيح — تأكد إنك لاصق رد Claude كامل بدون نص إضافي حواليه.'); }
-  if(typeof parsed !== 'object' || parsed===null) throw new Error('شكل البيانات غير متوقع.');
-  return parsed;
+  try{ parsed = JSON.parse(jsonRaw.trim()); }
+  catch(e){ throw new Error('كتلة الـ JSON في آخر الرد مش صحيحة الصياغة — تأكد إنك لاصق الرد كامل بدون تعديل.'); }
+  if(typeof parsed !== 'object' || parsed===null) throw new Error('شكل بيانات JSON غير متوقع.');
+
+  return { articleMarkdown, parsed };
 }
 
 const previewResearchBtn = document.getElementById('previewResearchBtn');
 if(previewResearchBtn){
   previewResearchBtn.onclick = ()=>{
-    let parsed;
-    try{ parsed = parseResearchJson(researchImportIn.value); }
+    let result;
+    try{ result = parseUnifiedResponse(researchImportIn.value); }
     catch(e){ researchPreviewEl.innerHTML = `<div class="rp-block" style="color:#e0674f;">${escapeHtml(e.message)}</div>`; return; }
 
+    const { articleMarkdown, parsed } = result;
     const summary = typeof parsed.hubSummary === 'string' ? parsed.hubSummary.trim() : '';
     const sources = Array.isArray(parsed.sources) ? parsed.sources.filter(s=> s && s.url && isSafeUrl(s.url)) : [];
     const suggestions = Array.isArray(parsed.suggestedConnections) ? parsed.suggestedConnections : [];
@@ -287,9 +341,10 @@ if(previewResearchBtn){
       return { ...s, target };
     });
 
-    lastResearchParsed = { summary, sources, matched };
+    lastResearchParsed = { summary, sources, matched, articleMarkdown };
 
     let html = '';
+    html += `<div class="rp-block"><h4>المقال (${articleMarkdown ? articleMarkdown.split(/\s+/).length : 0} كلمة تقريبًا)</h4>${articleMarkdown ? `<div class="rp-article-preview">${escapeHtml(articleMarkdown.slice(0,400))}…</div>` : '<em style="color:var(--muted)">مفيش مقال — اتأكد إنك لصقت الرد كامل</em>'}</div>`;
     html += `<div class="rp-block"><h4>الملخص</h4>${summary ? escapeHtml(summary) : '<em style="color:var(--muted)">فاضي</em>'}</div>`;
     html += `<div class="rp-block"><h4>المصادر (${sources.length})</h4>${sources.length ? sources.map(s=>`<div>• ${escapeHtml(s.label||s.url)}</div>`).join('') : '<em style="color:var(--muted)">لا يوجد</em>'}</div>`;
     html += `<div class="rp-block"><h4>روابط مقترحة (${matched.length})</h4>`;
@@ -306,7 +361,7 @@ if(previewResearchBtn){
       }).join('');
     }
     html += '</div>';
-    html += `<div class="rp-apply-actions"><button id="applyResearchBtn" class="analysis-primary-btn">✅ طبّق على العقدة الحالية</button></div>`;
+    html += `<div class="rp-apply-actions"><button id="applyResearchBtn" class="analysis-primary-btn">✅ طبّق المقال + الروابط على العقدة الحالية</button></div>`;
     researchPreviewEl.innerHTML = html;
 
     document.getElementById('applyResearchBtn').onclick = applyResearchResults;
@@ -315,7 +370,11 @@ if(previewResearchBtn){
 
 async function applyResearchResults(){
   if(!lastResearchParsed || !currentNode) return;
-  const { summary, sources, matched } = lastResearchParsed;
+  const { summary, sources, matched, articleMarkdown } = lastResearchParsed;
+  if(articleMarkdown){
+    notesEl.value = articleMarkdown;
+    notesEl.dispatchEvent(new Event('input')); // يشغّل نفس آلية الحفظ التلقائي الموجودة أصلاً
+  }
   if(summary) await saveHubSummaryOverride(currentNode.id, summary);
   if(sources.length){
     const existing = Array.isArray(currentNode.sources) ? currentNode.sources : [];
@@ -468,94 +527,5 @@ async function tryCompleteLink(targetNode){
   linkSourceId = null;
   linkModeBanner.style.display = 'none';
   return true;
-}
-
-// ============================================================
-// برومبت "المقال الكامل" (~5000 كلمة) — مخرجاته Markdown خام تتلصق يدويًا في
-// تبويب "تعديل" > الملاحظات، مش JSON. منفصل تمامًا عن buildResearchPrompt
-// (اللي هدفه بس ملخص قصير + مصادر + روابط مهيكلة للشبكة).
-// ============================================================
-function buildFullArticlePrompt(node){
-  return isTheologicalChainNode(node)
-    ? buildTheologicalFullArticlePrompt(node)
-    : buildEncyclopedicFullArticlePrompt(node);
-}
-
-function buildTheologicalFullArticlePrompt(node){
-  return `أنت باحث متخصص في التفسير وعلوم القرآن والسيرة النبوية. اكتب مقالًا بحثيًا كاملًا بصيغة Markdown خام (بدون أي نص تاني قبله أو بعده، وبدون JSON) بطول تقريبي 5000 كلمة، عن العقدة التالية، جزء من سلسلة قصة الخلق الخطية:
-
-العقدة: ${node.name}
-الفئة: ${node.category}
-
-## هيكل المقال المطلوب (استخدم عناوين Markdown بالظبط بهذا التسلسل)
-# ${node.name}
-## مقدمة
-تعريف شامل بالعقدة، مكانها في تسلسل قصة الخلق، وسبب أهميتها.
-## الخلفية والسياق القرآني والتفسيري
-الآيات المرتبطة، سياق نزولها لو معروف، وترتيبها الزمني في القصة.
-## الوصف الكامل
-شرح تفصيلي لما حدث في هذه العقدة تحديدًا.
-## أقوال المفسرين
-### التفسير عند المتقدمين (الطبري، ابن كثير، القرطبي، إلخ)
-### التفسير عند المتأخرين والمعاصرين (لو فيه اختلاف يُذكر)
-### نقاط الخلاف بين المفسرين (لو وُجدت)، بدون ترجيح شخصي منك
-## الأحاديث ذات الصلة
-اذكر أي حديث نبوي صحيح أو حسن مرتبط، مع تخريجه المختصر.
-## الدروس والعبر
-## الخلاصة
-
-## قواعد صارمة
-- كل معلومة لازم تتنسب لمصدرها (اسم المفسر/الكتاب/رقم الآية).
-- ممنوع اختراع أي آية أو حديث أو قول لم تتأكد منه.
-- لو فيه خلاف بين المفسرين، اعرض الرأيين بحياد بدون ترجيح.
-- الأسلوب: هادئ، تأملي، روحاني، بدون جدل أو تعقيد زائد.
-- الطول المستهدف: قريب من 5000 كلمة (لو الموضوع فعليًا صغير جدًا ومفيش مادة كافية، اكتب بقدر ما هو متاح بمصداقية بدل الحشو).
-
-ابدأ الرد مباشرة بـ "# ${node.name}" بدون أي مقدمة أو تعليق منك قبلها.`;
-}
-
-function buildEncyclopedicFullArticlePrompt(node){
-  return `أنت باحث تاريخي واستقصائي متخصص في بناء قواعد المعرفة (Knowledge Graph)، ملتزم بالحياد العلمي والتمييز الواضح بين الحقائق التاريخية، والفرضيات، والادعاءات، ونظريات المؤامرة. اكتب دراسة موسوعية نقدية شاملة بصيغة Markdown خام (بدون أي نص تاني قبله أو بعده، وبدون JSON) بطول تقريبي 5000 كلمة، عن العقدة التالية:
-
-العقدة: ${node.name}
-الفئة: ${node.category}
-
-اعتمد على أكبر عدد ممكن من المصادر المتنوعة الحقيقية (كتب أكاديمية، أبحاث محكّمة، وثائق حكومية، أرشيفات وطنية، صحف تاريخية، مواقع رسمية، كتب مؤيدة، كتب معارضة، موسوعات)، ولا تعتمد على ويكيبيديا وحدها. لا تعتبر أي معلومة حقيقة إلا إذا دعمتها مصادر موثوقة، ولا تعتبرها خاطئة لمجرد أن المجتمع الأكاديمي يرفضها — صنّف كل معلومة حسب مستوى الدليل (حقيقة تاريخية موثقة / حقيقة علمية / ادعاء / فرضية / رواية شفهية / نظرية مؤامرة / رأي شخصي / تفسير أكاديمي / تفسير بديل).
-
-## هيكل المقال المطلوب (استخدم عناوين Markdown بالظبط بهذا التسلسل)
-# ${node.name}
-## مقدمة
-تعريف شامل، سبب الأهمية، سبب الجدل.
-## الخلفية التاريخية
-الأصل، النشأة، التطور، الشخصيات المرتبطة، الأحداث المرتبطة.
-## الوصف الكامل
-الوصف التاريخي، التقني (إن وجد)، الأيديولوجي، الثقافي.
-## التسلسل الزمني
-Timeline كامل للأحداث المرتبطة.
-## الآراء المختلفة
-### الرأي الأكاديمي
-### الرأي المؤيد
-### الرأي المعارض
-### الرأي الوسطي
-### رأي الثقافة الشعبية
-(اذكر كيف ظهرت الفكرة في الكتب/السينما/الألعاب/الوثائقيات/الإنترنت، مع أمثلة حقيقية فقط لو متأكد منها)
-## تحليل الأدلة
-اكتب جدول Markdown بأعمدة: الدليل | النوع | المصدر | قوة الدليل
-## تقييم الموثوقية
-صنّف أهم المعلومات بنجوم: ★★★★★ موثق جدًا / ★★★★ جيد / ★★★ متوسط / ★★ ضعيف / ★ ادعاء فقط
-## تحليل علمي أو تاريخي
-حسب طبيعة الموضوع (فيزياء/كيمياء/هندسة/طب لو علمي، أو وثائق/صور/شهادات/مصادر أولية وثانوية لو تاريخي).
-## الانتقادات
-## تأثير العقدة
-كيف أثرت في التاريخ، السياسة، العلم، الثقافة، الإعلام.
-## الخلاصة
-خلاصة حيادية.
-
-## قواعد صارمة
-- عند أول ذكر لأي اسم عقدة تاني موجود في قاعدة المعرفة، وضّح طبيعة العلاقة في الجملة نفسها (حقيقة، ادعاء، فرضية، أو رابط شائع في أدبيات المؤامرة) — لا تكتفِ بذكر الاسم مجردًا.
-- ممنوع اختراع أي مصدر أو اقتباس أو تاريخ لم تتأكد منه من بحثك الفعلي.
-- الطول المستهدف: قريب من 5000 كلمة موزّعة على الأقسام أعلاه بتناسب (مش حشو فاضي — لو قسم معين مفيش عنه مادة كافية، اكتب بقدر المتاح بمصداقية ووضّح ذلك).
-
-ابدأ الرد مباشرة بـ "# ${node.name}" بدون أي مقدمة أو تعليق منك قبلها.`;
 }
 

@@ -1,3 +1,34 @@
+// ---- تحويل أي إشارة لعقدة بصيغة "الاسم [#رقم]" جوه نص المقال (Markdown) لرابط قابل للنقر ----
+function linkifyNodeMentions(html){
+  if(!html) return html;
+  return html.replace(/([\u0600-\u06FF][\u0600-\u06FFA-Za-z0-9 _\-"'،.:؛()]{0,80}?)\s*\[#(\d+)\]/g, (match, name, id)=>{
+    const nid = Number(id);
+    const target = (typeof nodes !== 'undefined') ? nodes.find(n=>n.id===nid) : null;
+    if(!target) return match;
+    return `<span class="mention-link" data-node-id="${nid}" role="button" tabindex="0">${name.trim()} <span class="mention-id">[#${id}]</span></span>`;
+  });
+}
+function bindMentionLinks(container){
+  if(!container || container.dataset.mentionsBound) return;
+  container.dataset.mentionsBound = '1';
+  container.addEventListener('click', (e)=>{
+    const el = e.target.closest('.mention-link');
+    if(!el) return;
+    const nid = Number(el.dataset.nodeId);
+    const target = nodes.find(n=>n.id===nid);
+    if(target) openNode(target, true);
+  });
+  container.addEventListener('keydown', (e)=>{
+    if(e.key!=='Enter' && e.key!==' ') return;
+    const el = e.target.closest('.mention-link');
+    if(!el) return;
+    e.preventDefault();
+    const nid = Number(el.dataset.nodeId);
+    const target = nodes.find(n=>n.id===nid);
+    if(target) openNode(target, true);
+  });
+}
+
 // ---- markdown article edit/preview tabs ----
 const tabEdit = document.getElementById('tabEdit');
 const tabPreview = document.getElementById('tabPreview');
@@ -10,7 +41,9 @@ tabPreview.onclick = ()=>{
   tabPreview.classList.add('active'); tabEdit.classList.remove('active');
   notesEl.style.display = 'none'; articlePreview.style.display = 'block';
   try{
-    articlePreview.innerHTML = window.marked ? window.marked.parse(notesEl.value || '') : notesEl.value;
+    const raw = window.marked ? window.marked.parse(notesEl.value || '') : notesEl.value;
+    articlePreview.innerHTML = linkifyNodeMentions(raw);
+    bindMentionLinks(articlePreview);
   }catch(e){
     articlePreview.textContent = notesEl.value;
   }
