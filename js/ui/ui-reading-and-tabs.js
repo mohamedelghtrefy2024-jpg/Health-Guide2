@@ -1,10 +1,15 @@
-// ---- Stage 1 / item 9: reading mode (fullscreen article preview) ----
+// ---- Stage 1 / item 9: reading mode → بقى بيفتح صفحة المقال الكامل مباشرة بدل تكبير جوه الـ drawer ----
 const readingModeBtn = document.getElementById('readingModeBtn');
 const readingModeExit = document.getElementById('readingModeExit');
 if(readingModeBtn){
   readingModeBtn.onclick = ()=>{
-    tabPreview.click();
-    drawer.classList.add('reading-mode');
+    if(typeof openArticleView === 'function' && currentNode){
+      openArticleView(currentNode);
+    } else {
+      // fallback احتياطي لو الدالة الجديدة مش متاحة لأي سبب
+      tabPreview.click();
+      drawer.classList.add('reading-mode');
+    }
   };
 }
 if(readingModeExit){
